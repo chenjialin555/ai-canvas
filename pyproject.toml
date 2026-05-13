@@ -1,0 +1,13 @@
+[project]
+name = "ai-canvas-backend"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "alibabacloud-oss-v2",
+    "dashscope",
+    "fastapi",
+    "httpx",
+    "pillow",
+    "python-dotenv",
+    "uvicorn",
+]
