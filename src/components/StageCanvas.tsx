@@ -12,7 +12,7 @@ import {
   Line,
 } from "react-konva";
 import Konva from "konva";
-import type { SceneContext } from "konva/lib/Context";
+import type { HitContext, SceneContext } from "konva/lib/Context";
 import type { Filter } from "konva/lib/Node";
 import { nanoid } from "nanoid";
 import { fallback, getImageDefaults, useEditorStore } from "../editor/store";
@@ -87,6 +87,75 @@ function readImageFile(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/** Transformer 旋转柄：白底圆 + 弧形箭头（Konva 默认方块/线不易辨认） */
+function rotateAnchorSceneFunc(
+  ctx: SceneContext,
+  shape: Konva.Rect,
+): void {
+  const w = shape.width();
+  const h = shape.height();
+  const cx = w / 2;
+  const cy = h / 2;
+  const R = Math.min(w, h) * 0.34;
+  const col = "#42c4c4";
+
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R + 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1.25;
+  ctx.stroke();
+
+  const startA = Math.PI * 0.55;
+  const sweep = Math.PI * 1.52;
+  const endA = startA + sweep;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R - 1.6, startA, endA, false);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 2.25;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+
+  const rr = R - 1.6;
+  const tipX = cx + rr * Math.cos(endA);
+  const tipY = cy + rr * Math.sin(endA);
+  const tangent = endA + Math.PI / 2;
+  const wing = 4.2;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(
+    tipX - wing * Math.cos(tangent - 0.55),
+    tipY - wing * Math.sin(tangent - 0.55),
+  );
+  ctx.lineTo(
+    tipX - wing * Math.cos(tangent + 0.55),
+    tipY - wing * Math.sin(tangent + 0.55),
+  );
+  ctx.closePath();
+  ctx.fillStyle = col;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** 命中层必须用 fillStrokeShape(shape)，否则会画成普通颜色而非 colorKey，点选检测不到 */
+function rotateAnchorHitFunc(ctx: HitContext, shape: Konva.Rect): void {
+  const w = shape.width();
+  const h = shape.height();
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = Math.max(w, h) / 2 + 10;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fillStrokeShape(shape);
 }
 
 function getSnap(
@@ -548,6 +617,28 @@ export function StageCanvas(props: StageCanvasProps) {
           <Transformer
             ref={transformerRef}
             rotateEnabled={!selectionHasGroup}
+            rotateLineVisible={false}
+            rotateAnchorOffset={40}
+            rotateAnchorCursor="grab"
+            anchorStyleFunc={(anchor) => {
+              const n = anchor.name();
+              if (n.startsWith("rotater")) {
+                const size = 28;
+                const half = size / 2;
+                anchor.setAttrs({
+                  width: size,
+                  height: size,
+                  offsetX: half,
+                  offsetY: half,
+                  cornerRadius: 0,
+                  fillEnabled: true,
+                  fill: "#ffffff",
+                  strokeEnabled: false,
+                  sceneFunc: rotateAnchorSceneFunc,
+                  hitFunc: rotateAnchorHitFunc,
+                });
+              }
+            }}
             enabledAnchors={[
               "top-left",
               "top-center",
@@ -559,6 +650,7 @@ export function StageCanvas(props: StageCanvasProps) {
               "bottom-right",
             ]}
             anchorSize={8}
+            anchorCornerRadius={2}
             anchorStroke="#42c4c4"
             anchorFill="#ffffff"
             borderStroke="#42c4c4"

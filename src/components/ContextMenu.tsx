@@ -13,6 +13,7 @@ type Props = {
   onClose: () => void;
   onCopy: () => void;
   onPaste: () => void;
+  onExportPng: () => void;
   onDelete: () => void;
   onBringToFront: () => void;
   onSendToBack: () => void;
@@ -70,6 +71,9 @@ export function ContextMenu(props: Props) {
 
       {selected?.type === "image" && (
         <>
+          <button type="button" onClick={props.onExportPng}>
+            导出PNG
+          </button>
           <button type="button" onClick={props.onCrop}>
             裁剪图片
           </button>

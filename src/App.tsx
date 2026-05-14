@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import { nanoid } from "nanoid";
 import { StageCanvas } from "./components/StageCanvas";
@@ -312,6 +312,12 @@ export default function App() {
           store.paste();
           setContextMenu((m) => ({ ...m, visible: false }));
         }}
+        onExportPng={() => {
+          if (selected?.type === "image") {
+            void exportCroppedImageAsPNG(selected);
+          }
+          setContextMenu((m) => ({ ...m, visible: false }));
+        }}
         onDelete={() => {
           store.removeSelected();
           setContextMenu((m) => ({ ...m, visible: false }));
@@ -439,11 +445,25 @@ function PageTabs() {
 }
 
 function LeftPanel() {
-  const { getActivePage, selectedIds, setSelectedIds, updateElement } =
-    useEditorStore();
+  const pageElements = useEditorStore(
+    (s) => s.pages.find((p) => p.id === s.activePageId)?.elements ?? [],
+  );
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const setSelectedIds = useEditorStore((s) => s.setSelectedIds);
+  const updateElement = useEditorStore((s) => s.updateElement);
 
-  const page = getActivePage();
-  const elements = [...page.elements].filter((el) => !el.parentId).reverse();
+  const [outlineQuery, setOutlineQuery] = useState("");
+
+  const elements = useMemo(
+    () => [...pageElements].filter((el) => !el.parentId).reverse(),
+    [pageElements],
+  );
+
+  const filteredElements = useMemo(() => {
+    const q = outlineQuery.trim().toLowerCase();
+    if (!q) return elements;
+    return elements.filter((el) => el.name.toLowerCase().includes(q));
+  }, [elements, outlineQuery]);
 
   return (
     <aside className="left-panel">
@@ -455,10 +475,23 @@ function LeftPanel() {
         <span>大纲</span>
       </div>
 
-      <input className="search" placeholder="搜索元素..." />
+      <input
+        className="search"
+        placeholder="搜索元素..."
+        value={outlineQuery}
+        onChange={(e) => setOutlineQuery(e.target.value)}
+        aria-label="按名称筛选图层"
+      />
 
       <div className="layers">
-        {elements.map((el) => (
+        {filteredElements.length === 0 ? (
+          <p className="outline-empty">
+            {elements.length === 0
+              ? "暂无图层"
+              : "无匹配图层"}
+          </p>
+        ) : (
+          filteredElements.map((el) => (
           <div
             key={el.id}
             className={`layer-row ${
@@ -503,7 +536,8 @@ function LeftPanel() {
               {el.visible ? "显" : "隐"}
             </button>
           </div>
-        ))}
+        ))
+        )}
       </div>
     </aside>
   );

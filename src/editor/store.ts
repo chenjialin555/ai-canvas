@@ -313,7 +313,20 @@ export const useEditorStore = create<Store>((set, get) => ({
       produce<Store>((state) => {
         const page = state.pages.find((p) => p.id === state.activePageId);
         const el = page?.elements.find((item) => item.id === id);
-        if (!el || el.locked) return;
+        if (!el) return;
+
+        const patchKeys = Object.keys(patch) as (keyof CanvasElement)[];
+        const allowedWhenLocked = new Set<keyof CanvasElement>([
+          "locked",
+          "visible",
+        ]);
+        if (
+          el.locked &&
+          !patchKeys.every((k) => allowedWhenLocked.has(k))
+        ) {
+          return;
+        }
+
         Object.assign(el, patch);
       }),
     );
