@@ -31,9 +31,9 @@ export default function App() {
     null,
   );
 
-  const [rightTab, setRightTab] = useState<"properties" | "aiChat">(
-    "properties",
-  );
+  const [rightTab, setRightTab] = useState<
+    "properties" | "aiGenerate" | "aiChat"
+  >("properties");
   const [aiChatAttachmentIds, setAiChatAttachmentIds] = useState<string[]>([]);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -136,7 +136,7 @@ export default function App() {
     setAiChatAttachmentIds((prev) =>
       prev.includes(id) ? prev : [...prev, id],
     );
-    setRightTab("aiChat");
+    setRightTab("aiGenerate");
   }
 
   function removeAiChatAttachment(id: string) {
@@ -543,7 +543,7 @@ function LeftPanel() {
   );
 }
 
-type RightPanelTab = "properties" | "aiChat";
+type RightPanelTab = "properties" | "aiGenerate" | "aiChat";
 
 function RightPanel(props: {
   tab: RightPanelTab;
@@ -564,7 +564,7 @@ function RightPanel(props: {
 
   return (
     <aside
-      className={`right-panel ${tab === "aiChat" ? "right-panel--chat" : ""}`}
+      className={`right-panel ${tab === "aiGenerate" ? "right-panel--chat" : ""}`}
     >
       <div className="right-tabs">
         <button
@@ -576,6 +576,13 @@ function RightPanel(props: {
         </button>
         <button
           type="button"
+          className={tab === "aiGenerate" ? "active" : ""}
+          onClick={() => onTabChange("aiGenerate")}
+        >
+          AI生成
+        </button>
+        <button
+          type="button"
           className={tab === "aiChat" ? "active" : ""}
           onClick={() => onTabChange("aiChat")}
         >
@@ -583,12 +590,14 @@ function RightPanel(props: {
         </button>
       </div>
 
-      {tab === "aiChat" && (
+      {tab === "aiGenerate" && (
         <AiChatPanel
           attachmentIds={aiChatAttachmentIds}
           onRemoveAttachment={onRemoveAiChatAttachment}
         />
       )}
+
+      {tab === "aiChat" && <div className="empty">暂无内容</div>}
 
       {tab === "properties" && !selected && (
         <div className="empty">请选择元素</div>
