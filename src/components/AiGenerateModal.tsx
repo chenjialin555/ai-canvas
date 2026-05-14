@@ -14,6 +14,8 @@ import { layoutNewAiImageBox, loadImageNaturalSize } from "../lib/aiImageLayout"
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** 生成结果：新图层（默认）或替换当前选中的图片 */
+  outputMode?: "new-layer" | "replace-selected";
 };
 
 export type ImageProvider =
@@ -35,7 +37,7 @@ export const PROVIDERS: { id: ImageProvider; label: string }[] = [
   { id: "ksyun", label: "金山云 KSYUN（预留）" },
 ];
 
-/** 与 `backend/providers.py` MODEL_PRESETS、Comfly 网关文档一致 */
+/** 与 `backend/app/providers/` 各文件中的 `models`、Comfly 网关文档一致 */
 export const MODEL_CHOICES: Record<
   ImageProvider,
   { value: string; label: string }[]
@@ -115,7 +117,8 @@ export function AiGenerateModal(props: Props) {
   const [guidanceScale, setGuidanceScale] = useState("");
   const [watermark, setWatermark] = useState(false);
 
-  const { addElement, selectedIds, getActivePage } = useEditorStore();
+  const { addElement, selectedIds, getActivePage, replaceImageKeepFrame } =
+    useEditorStore();
 
   const selected = useEditorStore((st) => {
     const pg = st.pages.find((p) => p.id === st.activePageId);
@@ -133,11 +136,19 @@ export function AiGenerateModal(props: Props) {
   }, [selected]);
 
   const layerResultHint = useMemo(() => {
+    const outMode = props.outputMode ?? "new-layer";
+    if (
+      outMode === "replace-selected" &&
+      selected?.type === "image" &&
+      !selected.aiMask
+    ) {
+      return "生成结果将替换当前图片的源内容，图层外框与蒙版设置保持不变（无局部蒙版时）。";
+    }
     if (selected?.type === "image") {
       return "生成结果将作为新图层出现在该图右侧；外框宽高比与生成图真实像素一致，宽度与参考图层对齐，不替换原图与蒙版。";
     }
     return "生成结果将作为新图片加入画布；外框宽高比与生成图真实像素一致。";
-  }, [selected]);
+  }, [selected, props.outputMode]);
 
   const providerLabel =
     PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
@@ -262,6 +273,20 @@ export function AiGenerateModal(props: Props) {
           logApiEvent("response", "生成图宽高读取失败，使用默认比例排布", {
             urlHead: url.slice(0, 160),
           });
+        }
+
+        const outputMode = props.outputMode ?? "new-layer";
+        const replaceTargetId =
+          outputMode === "replace-selected" &&
+          selected?.type === "image" &&
+          !maskDataURL
+            ? selected.id
+            : null;
+
+        if (replaceTargetId) {
+          replaceImageKeepFrame(replaceTargetId, url);
+          props.onClose();
+          return;
         }
 
         const box = await layoutNewAiImageBox(url, selected);

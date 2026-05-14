@@ -110,6 +110,8 @@ export type Page = {
 
 export type ToolType = "select" | "rect" | "text" | "image" | "arrow" | "hand";
 
+import type { QuickToolId, QuickToolbarScopeKey } from "./quickTools";
+
 export type EditorState = {
   pages: Page[];
   activePageId: string;
@@ -125,6 +127,9 @@ export type EditorState = {
   tool: ToolType;
 
   editingTextId: string | null;
+
+  /** 各类型元素浮动快捷条按钮（持久化到 localStorage） */
+  quickToolbarConfig: Record<QuickToolbarScopeKey, QuickToolId[]>;
 };
 
 export type ProjectJSON = {

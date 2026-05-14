@@ -102,6 +102,9 @@ function rotateAnchorSceneFunc(
   const col = "#42c4c4";
 
   ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 2);
+  ctx.translate(-cx, -cy);
 
   ctx.beginPath();
   ctx.arc(cx, cy, R + 1.5, 0, Math.PI * 2);
@@ -156,6 +159,32 @@ function rotateAnchorHitFunc(ctx: HitContext, shape: Konva.Rect): void {
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.closePath();
   ctx.fillStrokeShape(shape);
+}
+
+/** 旋转柄布局（供 anchorStyleFunc 与 transformend 后复位共用） */
+function styleRotaterAnchor(anchor: Konva.Node, tr: Konva.Transformer): void {
+  const nm = anchor.name();
+  if (!nm || !nm.startsWith("rotater")) return;
+  if (typeof tr.height !== "function") return;
+  const h = tr.height();
+  const pad = tr.padding();
+  const gap = tr.rotateAnchorOffset();
+  const size = 28;
+  const half = size / 2;
+  anchor.setAttrs({
+    x: 0,
+    y: h / 2,
+    offsetX: half + pad + gap,
+    offsetY: half,
+    width: size,
+    height: size,
+    cornerRadius: 0,
+    fillEnabled: true,
+    fill: "#ffffff",
+    strokeEnabled: false,
+    sceneFunc: rotateAnchorSceneFunc,
+    hitFunc: rotateAnchorHitFunc,
+  });
 }
 
 function getSnap(
@@ -299,6 +328,37 @@ export function StageCanvas(props: StageCanvasProps) {
   }, [selectedIds, elements, editingTextId, selectionHasGroup]);
 
   useEffect(() => {
+    const tr = transformerRef.current;
+    if (!tr) return;
+    const onStart = () => {
+      useEditorStore.getState().setFloatingToolbarSuppressed(true);
+    };
+    const onEnd = () => {
+      useEditorStore.getState().setFloatingToolbarSuppressed(false);
+      /** 松手后先 forceUpdate，再在下一帧重套旋转柄 attrs（避免 setAbsolutePosition 残留 + 早于 store 同步） */
+      requestAnimationFrame(() => {
+        transformerRef.current?.forceUpdate();
+        requestAnimationFrame(() => {
+          const tr2 = transformerRef.current;
+          if (!tr2) return;
+          const rot = tr2.findOne(function (this: Konva.Node) {
+            const n = this.name();
+            return typeof n === "string" && n.startsWith("rotater");
+          });
+          if (rot) styleRotaterAnchor(rot, tr2);
+          tr2.getLayer()?.batchDraw();
+        });
+      });
+    };
+    tr.on("transformstart", onStart);
+    tr.on("transformend", onEnd);
+    return () => {
+      tr.off("transformstart", onStart);
+      tr.off("transformend", onEnd);
+    };
+  }, [selectedIds, elements, editingTextId]);
+
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
@@ -384,6 +444,7 @@ export function StageCanvas(props: StageCanvasProps) {
     const world = screenToWorld(pointer);
 
     setIsSelecting(true);
+    useEditorStore.getState().setMarqueeSelecting(true);
     setSelection({
       visible: true,
       x1: world.x,
@@ -417,6 +478,8 @@ export function StageCanvas(props: StageCanvasProps) {
 
   function handleMouseUp() {
     if (!isSelecting) return;
+
+    useEditorStore.getState().setMarqueeSelecting(false);
 
     setIsSelecting(false);
 
@@ -555,7 +618,14 @@ export function StageCanvas(props: StageCanvasProps) {
         x={pan.x}
         y={pan.y}
         draggable={!isSelecting}
+        onDragStart={(e) => {
+          const st = stageRef.current;
+          if (st && e.target === st) {
+            useEditorStore.getState().setFloatingToolbarSuppressed(true);
+          }
+        }}
         onDragEnd={(e) => {
+          useEditorStore.getState().setFloatingToolbarSuppressed(false);
           const stage = stageRef.current;
           if (!stage) return;
 
@@ -618,25 +688,14 @@ export function StageCanvas(props: StageCanvasProps) {
             ref={transformerRef}
             rotateEnabled={!selectionHasGroup}
             rotateLineVisible={false}
-            rotateAnchorOffset={40}
+            rotateAnchorOffset={44}
             rotateAnchorCursor="grab"
             anchorStyleFunc={(anchor) => {
               const n = anchor.name();
               if (n.startsWith("rotater")) {
-                const size = 28;
-                const half = size / 2;
-                anchor.setAttrs({
-                  width: size,
-                  height: size,
-                  offsetX: half,
-                  offsetY: half,
-                  cornerRadius: 0,
-                  fillEnabled: true,
-                  fill: "#ffffff",
-                  strokeEnabled: false,
-                  sceneFunc: rotateAnchorSceneFunc,
-                  hitFunc: rotateAnchorHitFunc,
-                });
+                const tr = anchor.getParent() as Konva.Transformer;
+                if (!tr) return;
+                styleRotaterAnchor(anchor, tr);
               }
             }}
             enabledAnchors={[
@@ -768,6 +827,7 @@ function commonProps(element: CanvasElement, setGuides: (g: GuideLine[]) => void
       }
     },
     onDragStart: () => {
+      useEditorStore.getState().setFloatingToolbarSuppressed(true);
       useEditorStore.getState().commitHistory();
     },
     onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -789,6 +849,7 @@ function commonProps(element: CanvasElement, setGuides: (g: GuideLine[]) => void
     },
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
       setGuides([]);
+      useEditorStore.getState().setFloatingToolbarSuppressed(false);
 
       const state = useEditorStore.getState();
       const pg = state.getActivePage();
@@ -1141,6 +1202,7 @@ function GroupNode(props: {
         }
       }}
       onDragStart={() => {
+        useEditorStore.getState().setFloatingToolbarSuppressed(true);
         commitHistory();
       }}
       onDragMove={(e) => {
@@ -1155,6 +1217,7 @@ function GroupNode(props: {
       }}
       onDragEnd={(e) => {
         props.setGuides([]);
+        useEditorStore.getState().setFloatingToolbarSuppressed(false);
         const st = useEditorStore.getState();
         const cur = st.getActivePage().elements.find((x) => x.id === g.id);
         if (!cur || cur.type !== "group") return;

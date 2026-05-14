@@ -9,6 +9,8 @@ import { AiGenerateModal } from "./components/AiGenerateModal";
 import { AiChatPanel } from "./components/AiChatPanel";
 import { MaskEditorModal } from "./components/MaskEditorModal";
 import { CropEditorModal } from "./components/CropEditorModal";
+import { FloatingToolbar } from "./components/FloatingToolbar";
+import { QuickToolbarSettings } from "./components/QuickToolbarSettings";
 import {
   downloadDataURL,
   downloadJSON,
@@ -30,6 +32,18 @@ export default function App() {
   const [cropEditorImageId, setCropEditorImageId] = useState<string | null>(
     null,
   );
+
+  const [quickToolbarSettingsOpen, setQuickToolbarSettingsOpen] =
+    useState(false);
+  const [aiOutputMode, setAiOutputMode] = useState<
+    "new-layer" | "replace-selected"
+  >("new-layer");
+  const [toolbarToast, setToolbarToast] = useState<string | null>(null);
+  const toolbarToastTimerRef = useRef<number | null>(null);
+  const [replaceImageTargetId, setReplaceImageTargetId] = useState<
+    string | null
+  >(null);
+  const replaceImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [rightTab, setRightTab] = useState<
     "properties" | "aiGenerate" | "aiChat"
@@ -177,6 +191,29 @@ export default function App() {
         }}
       />
 
+      <input
+        ref={replaceImageInputRef}
+        hidden
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const id = replaceImageTargetId;
+          e.currentTarget.value = "";
+          if (!file || !id || !file.type.startsWith("image/")) {
+            setReplaceImageTargetId(null);
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            store.replaceImageKeepFrame(id, String(reader.result));
+            setReplaceImageTargetId(null);
+          };
+          reader.onerror = () => setReplaceImageTargetId(null);
+          reader.readAsDataURL(file);
+        }}
+      />
+
       <header className="figma-topbar">
         <div className="brand">
           <strong>AI Canvas</strong>
@@ -208,6 +245,12 @@ export default function App() {
           </button>
           <button type="button" onClick={() => setAiOpen(true)}>
             AI 生图
+          </button>
+          <button
+            type="button"
+            onClick={() => setQuickToolbarSettingsOpen(true)}
+          >
+            快捷工具条
           </button>
 
           <span className="sep" />
@@ -290,6 +333,32 @@ export default function App() {
           />
 
           <MiniMap />
+
+          <FloatingToolbar
+            stageRef={stageRef}
+            onCrop={(id) => setCropEditorImageId(id)}
+            onMask={(id) => setMaskEditorImageId(id)}
+            onOpenAI={({ imageId, mode }) => {
+              store.setSelectedIds([imageId]);
+              setAiOutputMode(mode);
+              setAiOpen(true);
+            }}
+            onConnect={() => {
+              if (toolbarToastTimerRef.current) {
+                window.clearTimeout(toolbarToastTimerRef.current);
+              }
+              setToolbarToast("连线功能开发中…");
+              toolbarToastTimerRef.current = window.setTimeout(() => {
+                setToolbarToast(null);
+                toolbarToastTimerRef.current = null;
+              }, 2400);
+            }}
+            onReplaceImage={(imageId) => {
+              setReplaceImageTargetId(imageId);
+              replaceImageInputRef.current?.click();
+            }}
+            onOpenLibrary={() => setLibraryOpen(true)}
+          />
         </section>
 
         <RightPanel
@@ -361,6 +430,7 @@ export default function App() {
           setContextMenu((m) => ({ ...m, visible: false }));
         }}
         onOpenAI={() => {
+          setAiOutputMode("new-layer");
           setAiOpen(true);
           setContextMenu((m) => ({ ...m, visible: false }));
         }}
@@ -384,7 +454,24 @@ export default function App() {
       />
 
       <LibraryPanel open={libraryOpen} onClose={() => setLibraryOpen(false)} />
-      <AiGenerateModal open={aiOpen} onClose={() => setAiOpen(false)} />
+      <QuickToolbarSettings
+        open={quickToolbarSettingsOpen}
+        onClose={() => setQuickToolbarSettingsOpen(false)}
+      />
+
+      {toolbarToast && (
+        <div className="toolbar-toast" role="status">
+          {toolbarToast}
+        </div>
+      )}
+      <AiGenerateModal
+        open={aiOpen}
+        outputMode={aiOutputMode}
+        onClose={() => {
+          setAiOpen(false);
+          setAiOutputMode("new-layer");
+        }}
+      />
       <MaskEditorModal
         open={!!maskEditorImageId}
         imageId={maskEditorImageId}

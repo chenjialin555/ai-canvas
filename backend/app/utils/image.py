@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import logging
 import math
@@ -6,7 +8,6 @@ from typing import Optional, Tuple
 
 import httpx
 from PIL import Image
-
 
 MIN_PIXELS = 3686400
 

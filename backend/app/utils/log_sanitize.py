@@ -1,12 +1,12 @@
 """
-脱敏 / 缩短日志中的大字段（data URL、长 prompt 等），避免日志文件爆盘。
+脱敏 / 缩短日志中的大字段（data URL、长 prompt 等）。
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from .schemas import GenerateImageRequest
+from backend.app.schemas.generation import GenerateImageRequest
 
 _MAX_RECURSE = 10
 _MAX_LIST_ITEMS = 25

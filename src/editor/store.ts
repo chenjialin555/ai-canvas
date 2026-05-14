@@ -2,6 +2,13 @@ import { create } from "zustand";
 import { produce } from "immer";
 import { nanoid } from "nanoid";
 import { logApiEvent } from "../lib/apiDebug";
+import {
+  DEFAULT_QUICK_TOOLBAR_CONFIG,
+  mergeQuickToolbarConfig,
+  normalizeQuickToolbarIds,
+  type QuickToolId,
+  type QuickToolbarScopeKey,
+} from "./quickTools";
 import type {
   CanvasElement,
   EditorState,
@@ -125,6 +132,7 @@ function getInitial(): EditorState {
         activePageId?: string;
         zoom?: number;
         pan?: { x: number; y: number };
+        quickToolbarConfig?: unknown;
       };
       if (Array.isArray(data.pages) && data.pages.length > 0) {
         return {
@@ -135,6 +143,7 @@ function getInitial(): EditorState {
           pan: data.pan || { x: 0, y: 0 },
           tool: "select",
           editingTextId: null,
+          quickToolbarConfig: mergeQuickToolbarConfig(data.quickToolbarConfig),
         };
       }
     }
@@ -152,6 +161,7 @@ function getInitial(): EditorState {
     pan: { x: 0, y: 0 },
     tool: "select",
     editingTextId: null,
+    quickToolbarConfig: { ...DEFAULT_QUICK_TOOLBAR_CONFIG },
   };
 }
 
@@ -161,6 +171,10 @@ type Snapshot = Pick<
 >;
 
 type Store = EditorState & {
+  /** 框选进行中：隐藏浮动快捷条 */
+  marqueeSelecting: boolean;
+  /** 拖动画布 / 元素 / 变换时隐藏浮动条 */
+  floatingToolbarSuppressed: boolean;
 
   historyPast: Snapshot[];
   historyFuture: Snapshot[];
@@ -207,6 +221,13 @@ type Store = EditorState & {
 
   setEditingTextId: (id: string | null) => void;
 
+  setQuickToolbarConfig: (
+    scope: QuickToolbarScopeKey,
+    ids: QuickToolId[],
+  ) => void;
+  setMarqueeSelecting: (v: boolean) => void;
+  setFloatingToolbarSuppressed: (v: boolean) => void;
+
   replaceImageKeepFrame: (id: string, src: string) => void;
 
   setImageAIMask: (id: string, mask: ImageMaskData | null) => void;
@@ -242,6 +263,9 @@ function makeSnapshot(state: Store): Snapshot {
 
 export const useEditorStore = create<Store>((set, get) => ({
   ...getInitial(),
+
+  marqueeSelecting: false,
+  floatingToolbarSuppressed: false,
 
   historyPast: [],
   historyFuture: [],
@@ -304,7 +328,12 @@ export const useEditorStore = create<Store>((set, get) => ({
     );
   },
 
-  setSelectedIds: (ids) => set({ selectedIds: ids }),
+  setSelectedIds: (ids) =>
+    set({
+      selectedIds: ids,
+      /** 新选区时清除，避免拖移/变换结束后标志残留导致浮动条永远不出现 */
+      floatingToolbarSuppressed: false,
+    }),
 
   updateElement: (id, patch, options) => {
     if (options?.history !== false) get().commitHistory();
@@ -560,6 +589,18 @@ export const useEditorStore = create<Store>((set, get) => ({
   setTool: (tool) => set({ tool }),
   setEditingTextId: (id) => set({ editingTextId: id }),
 
+  setQuickToolbarConfig: (scope, ids) => {
+    set(
+      produce<Store>((state) => {
+        state.quickToolbarConfig[scope] = normalizeQuickToolbarIds(ids, scope);
+      }),
+    );
+  },
+
+  setMarqueeSelecting: (v) => set({ marqueeSelecting: v }),
+
+  setFloatingToolbarSuppressed: (v) => set({ floatingToolbarSuppressed: v }),
+
   replaceImageKeepFrame: (id, src) => {
     get().commitHistory();
 
@@ -778,6 +819,7 @@ export const useEditorStore = create<Store>((set, get) => ({
         activePageId: state.activePageId,
         zoom: state.zoom,
         pan: state.pan,
+        quickToolbarConfig: state.quickToolbarConfig,
       }),
     );
   },
@@ -840,6 +882,7 @@ useEditorStore.subscribe(() => {
       activePageId: state.activePageId,
       zoom: state.zoom,
       pan: state.pan,
+      quickToolbarConfig: state.quickToolbarConfig,
     }),
   );
 });
