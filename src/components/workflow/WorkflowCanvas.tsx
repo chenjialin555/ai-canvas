@@ -11,7 +11,7 @@ import {
   bezierHorizontalOffset,
 } from "../../workflow/nodeLayout";
 import { PORT_COLORS } from "../../workflow/portColors";
-import type { WorkflowEdge, WorkflowNode } from "../../workflow/types";
+import type { WorkflowNode } from "../../workflow/types";
 import { NodePicker } from "./NodePicker";
 import { WorkflowNodeView } from "./WorkflowNodeView";
 
@@ -66,7 +66,6 @@ export function WorkflowCanvas(props: Props) {
   const connecting = useEditorStore((s) => s.workflowConnecting);
   const picker = useEditorStore((s) => s.workflowNodePicker);
 
-  const startConn = useEditorStore((s) => s.startWorkflowConnecting);
   const updatePtr = useEditorStore((s) => s.updateWorkflowConnectingPointer);
   const openPicker = useEditorStore((s) => s.openWorkflowNodePicker);
 
@@ -122,12 +121,14 @@ export function WorkflowCanvas(props: Props) {
   }, [wf.edges, wf.nodes]);
 
   const tempLinePts = useMemo(() => {
-    if (!connecting.active || !connecting.from) return null;
-    if (connecting.from.kind !== "ai-node") return null;
-    const from = wf.nodes.find((n) => n.id === connecting.from.nodeId);
+    if (!connecting.active) return null;
+    const ep = connecting.from;
+    if (!ep) return null;
+    if (ep.kind !== "ai-node") return null;
+    const from = wf.nodes.find((n) => n.id === ep.nodeId);
     if (!from) return null;
     const def = getWorkflowNodeDefinition(from.type);
-    const outI = def.outputs.findIndex((p) => p.id === connecting.from.portId);
+    const outI = def.outputs.findIndex((p) => p.id === ep.portId);
     const pyOut = AI_NODE_PORT_TOP + Math.max(0, outI) * AI_NODE_PORT_GAP;
     const x1 = from.x + from.width - AI_NODE_OUTPUT_PORT_CX;
     const y1 = from.y + pyOut;

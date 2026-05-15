@@ -1,5 +1,5 @@
 import type { CanvasElement, ImageElement, Page } from "../../editor/types";
-import { exportImageMaskToDataURL } from "../../editor/mask";
+import { exportImageMaskToDataURL } from "../../image-tools/mask/maskRasterize";
 import { getWorkflowNodeDefinition } from "../nodeRegistry";
 import {
   AI_NODE_MAX_HEIGHT,
@@ -168,33 +168,35 @@ export function edgeBezierPointsUnified(
   let x2: number;
   let y2: number;
 
-  if (edge.from.kind === "image-element") {
-    const el = page.elements.find((e) => e.id === edge.from.elementId) as
+  const fromEp = edge.from;
+  if (fromEp.kind === "image-element") {
+    const el = page.elements.find((e) => e.id === fromEp.elementId) as
       | ImageElement
       | undefined;
     if (!el || el.type !== "image") {
       return [0, 0, 0, 0, 0, 0, 0, 0];
     }
-    const o = imageOutputPortOffset(edge.from.portId, el.width, el.height);
+    const o = imageOutputPortOffset(fromEp.portId, el.width, el.height);
     x1 = el.x + o.x;
     y1 = el.y + o.y;
   } else {
-    const n = page.aiNodes.find((a) => a.id === edge.from.nodeId);
+    const n = page.aiNodes.find((a) => a.id === fromEp.nodeId);
     if (!n) return [0, 0, 0, 0, 0, 0, 0, 0];
-    const p = aiNodePortWorld(n, edge.from.portId, "output");
+    const p = aiNodePortWorld(n, fromEp.portId, "output");
     x1 = p.x;
     y1 = p.y;
   }
 
-  if (edge.to.kind !== "ai-node") {
+  const toEp = edge.to;
+  if (toEp.kind !== "ai-node") {
     const x2 = x1 + 1;
     const y2 = y1;
     const off = bezierHorizontalOffset(x1, x2);
     return [x1, y1, x1 + off, y1, x2 - off, y2, x2, y2];
   }
-  const n2 = page.aiNodes.find((a) => a.id === edge.to.nodeId);
+  const n2 = page.aiNodes.find((a) => a.id === toEp.nodeId);
   if (!n2) return [x1, y1, x1 + 120, y1, x1 + 120, y1, x1, y1];
-  const p2 = aiNodePortWorld(n2, edge.to.portId, "input");
+  const p2 = aiNodePortWorld(n2, toEp.portId, "input");
   x2 = p2.x;
   y2 = p2.y;
 

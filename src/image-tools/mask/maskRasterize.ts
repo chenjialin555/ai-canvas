@@ -1,4 +1,4 @@
-import type { ImageElement, ImageMaskData } from "./types";
+import type { ImageElement, ImageMaskData } from "../../editor/types";
 
 export function exportMaskToDataURL(mask: ImageMaskData): string {
   const canvas = document.createElement("canvas");

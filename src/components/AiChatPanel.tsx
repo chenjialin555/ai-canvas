@@ -13,7 +13,8 @@ import {
   MODEL_CHOICES,
   PROVIDERS,
   type ImageProvider,
-} from "./AiGenerateModal";
+} from "../ai/generation/generationTypes";
+import { postGenerateImage } from "../ai/api/generationApi";
 
 type ChatMsg =
   | {
@@ -129,47 +130,47 @@ export function AiChatPanel(props: Props) {
     });
 
     try {
-      const res = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Request-ID": traceId,
-        },
-        body: JSON.stringify(payload),
-      });
+      const apiRes = await postGenerateImage(payload, traceId);
 
-      const text = await res.text();
-      let data: { url?: string; detail?: unknown };
-      try {
-        data = JSON.parse(text) as { url?: string; detail?: unknown };
-      } catch {
-        logApiEvent("error", "AI 对话 响应非 JSON", {
-          httpStatus: res.status,
+      if (!apiRes.ok) {
+        if (apiRes.reason === "not_json") {
+          logApiEvent("error", "AI 对话 响应非 JSON", {
+            httpStatus: apiRes.status,
+            traceId,
+            rawTextHead: apiRes.rawText.slice(0, 800),
+          });
+          setMessages((m) => [
+            ...m,
+            {
+              id: nanoid(),
+              role: "assistant",
+              text: `接口返回非 JSON（HTTP ${apiRes.status}）：${apiRes.rawText.slice(0, 400)}`,
+              error: true,
+            },
+          ]);
+          return;
+        }
+        if (apiRes.reason === "network") {
+          setMessages((m) => [
+            ...m,
+            {
+              id: nanoid(),
+              role: "assistant",
+              text: `错误：${apiRes.message}`,
+              error: true,
+            },
+          ]);
+          return;
+        }
+        const data = apiRes.data;
+        logApiEvent("response", `/api/generate-image HTTP ${apiRes.status}`, {
           traceId,
-          rawTextHead: text.slice(0, 800),
+          ok: false,
+          json: summarizeResponseBodyForLog({ ...data } as Record<string, unknown>),
         });
-        setMessages((m) => [
-          ...m,
-          {
-            id: nanoid(),
-            role: "assistant",
-            text: `接口返回非 JSON（HTTP ${res.status}）：${text.slice(0, 400)}`,
-            error: true,
-          },
-        ]);
-        return;
-      }
-
-      logApiEvent("response", `/api/generate-image HTTP ${res.status}`, {
-        traceId,
-        ok: res.ok,
-        json: summarizeResponseBodyForLog({ ...data } as Record<string, unknown>),
-      });
-
-      if (!res.ok) {
         const errText =
           formatApiDetail(data.detail) ||
-          `请求失败 HTTP ${res.status}：${text.slice(0, 400)}`;
+          `请求失败 HTTP ${apiRes.status}：${apiRes.rawText.slice(0, 400)}`;
         setMessages((m) => [
           ...m,
           {
@@ -182,6 +183,13 @@ export function AiChatPanel(props: Props) {
         ]);
         return;
       }
+
+      const { data, status } = apiRes;
+      logApiEvent("response", `/api/generate-image HTTP ${status}`, {
+        traceId,
+        ok: true,
+        json: summarizeResponseBodyForLog({ ...data } as Record<string, unknown>),
+      });
 
       const url = data.url?.trim();
       if (!url) {

@@ -1,4 +1,4 @@
-import { exportImageMaskToDataURL } from "../../editor/mask";
+import { exportImageMaskToDataURL } from "../../image-tools/mask/maskRasterize";
 import type { ImageElement, Page } from "../../editor/types";
 import { resolveAiNodeInputs } from "./unifiedGraph";
 

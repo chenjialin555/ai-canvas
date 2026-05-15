@@ -1,102 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { nanoid } from "nanoid";
-import { getImageDefaults, useEditorStore } from "../editor/store";
-import { exportImageMaskToDataURL } from "../editor/mask";
-import type { CanvasElement } from "../editor/types";
-import {
-  logApiEvent,
-  summarizePayloadForLog,
-  summarizeResponseBodyForLog,
-} from "../lib/apiDebug";
-import { formatApiDetail } from "../lib/apiFormat";
-import { layoutNewAiImageBox, loadImageNaturalSize } from "../lib/aiImageLayout";
+import { useEditorStore } from "../../editor/store";
+import { generateImageFromModal } from "./generationService";
+import { MODEL_CHOICES, PROVIDERS, type ImageProvider } from "./generationTypes";
+
+export type { ImageProvider } from "./generationTypes";
+export { MODEL_CHOICES, PROVIDERS };
 
 type Props = {
   open: boolean;
   onClose: () => void;
   /** 生成结果：新图层（默认）或替换当前选中的图片 */
   outputMode?: "new-layer" | "replace-selected";
-};
-
-export type ImageProvider =
-  | "banana"
-  | "doubao"
-  | "gemini"
-  | "flux"
-  | "qwen"
-  | "gpt-image"
-  | "ksyun";
-
-export const PROVIDERS: { id: ImageProvider; label: string }[] = [
-  { id: "banana", label: "Banana / Nano Banana" },
-  { id: "gemini", label: "Gemini (图)" },
-  { id: "doubao", label: "豆包 Doubao" },
-  { id: "flux", label: "Flux" },
-  { id: "qwen", label: "通义 Qwen" },
-  { id: "gpt-image", label: "GPT Image" },
-  { id: "ksyun", label: "金山云 KSYUN（预留）" },
-];
-
-/** 与 `backend/app/providers/` 各文件中的 `models`、Comfly 网关文档一致 */
-export const MODEL_CHOICES: Record<
-  ImageProvider,
-  { value: string; label: string }[]
-> = {
-  banana: [
-    { value: "nano-banana-2-2k", label: "nano-banana-2-2k" },
-    {
-      value: "gemini-3.1-flash-image-preview-2k",
-      label: "gemini-3.1-flash-image-preview-2k",
-    },
-    {
-      value: "gemini-3.1-flash-image-preview-4k",
-      label: "gemini-3.1-flash-image-preview-4k",
-    },
-    { value: "nano-banana-pro", label: "nano-banana-pro" },
-    { value: "nano-banana-pro-2k", label: "nano-banana-pro-2k" },
-  ],
-  gemini: [
-    {
-      value: "gemini-3.1-flash-image-preview-2k",
-      label: "gemini-3.1-flash-image-preview-2k",
-    },
-    {
-      value: "gemini-3.1-flash-image-preview-4k",
-      label: "gemini-3.1-flash-image-preview-4k",
-    },
-  ],
-  doubao: [
-    {
-      value: "doubao-seedream-5-0-260128",
-      label: "doubao-seedream-5-0-260128",
-    },
-    {
-      value: "doubao-seedream-4-5-251128",
-      label: "doubao-seedream-4-5-251128",
-    },
-    {
-      value: "doubao-seededit-3-0-i2i-250628",
-      label: "doubao-seededit-3-0-i2i-250628",
-    },
-  ],
-  flux: [
-    { value: "flux-kontext-pro", label: "flux-kontext-pro" },
-    { value: "flux-kontext-max", label: "flux-kontext-max" },
-    { value: "flux-1.1-pro", label: "flux-1.1-pro" },
-    { value: "flux-dev", label: "flux-dev" },
-  ],
-  qwen: [
-    { value: "qwen-image-edit-max", label: "qwen-image-edit-max" },
-    { value: "qwen-image-edit", label: "qwen-image-edit" },
-    { value: "qwen-image", label: "qwen-image" },
-    { value: "qwen-vl-max", label: "qwen-vl-max" },
-    { value: "qwen-vl-plus", label: "qwen-vl-plus" },
-  ],
-  "gpt-image": [{ value: "gpt-image-2", label: "gpt-image-2（仅此一项）" }],
-  ksyun: [
-    { value: "ksyun-image", label: "ksyun-image（预留）" },
-    { value: "ksyun-image-edit", label: "ksyun-image-edit（预留）" },
-  ],
 };
 
 export function AiGenerateModal(props: Props) {
@@ -158,172 +72,28 @@ export function AiGenerateModal(props: Props) {
   async function generate() {
     setGenError(null);
     setLoading(true);
-
     try {
       const page = getActivePage();
-      const selected = page.elements.find((el) => el.id === selectedIds[0]);
-
-      const maskDataURL =
-        selected?.type === "image" && selected.aiMask
-          ? exportImageMaskToDataURL(selected)
-          : null;
-
-      const sourceImage =
-        selected?.type === "image" ? selected.src : null;
-
-      const mode = maskDataURL
-        ? "inpaint"
-        : sourceImage
-          ? "image-to-image"
-          : "generate";
-
-      const traceId = nanoid();
-
-      const payload: Record<string, unknown> = {
-        provider,
-        model,
-        prompt: prompt.trim(),
-        image: sourceImage ?? undefined,
-        mask: maskDataURL ?? undefined,
-        mode,
-        ratio,
-        resolution,
-        watermark,
-        traceId,
-        clientId: "web",
-      };
-      if (size.trim()) payload.size = size.trim();
-      if (seed.trim()) payload.seed = Number(seed.trim());
-      if (guidanceScale.trim()) {
-        payload.guidanceScale = Number(guidanceScale.trim());
-      }
-
-      logApiEvent("request", "POST /api/generate-image", {
-        url: `${window.location.origin}/api/generate-image`,
-        traceId,
-        headers: { "Content-Type": "application/json", "X-Request-ID": traceId },
-        bodySummary: summarizePayloadForLog(payload as Record<string, unknown>),
-        bodyJsonBytes: JSON.stringify(payload).length,
+      const result = await generateImageFromModal({
+        outputMode: props.outputMode ?? "new-layer",
+        form: {
+          provider,
+          model,
+          prompt,
+          ratio,
+          resolution,
+          watermark,
+          size,
+          seed,
+          guidanceScale,
+        },
+        page,
+        primarySelectedId: selectedIds[0],
+        onSuccessClose: props.onClose,
+        addElement,
+        replaceImageKeepFrame,
       });
-
-      try {
-        const res = await fetch("/api/generate-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Request-ID": traceId,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        const text = await res.text();
-        let data: { url?: string; detail?: unknown };
-        try {
-          data = JSON.parse(text) as { url?: string; detail?: unknown };
-        } catch {
-          logApiEvent("error", "响应非 JSON", {
-            httpStatus: res.status,
-            traceId,
-            requestIdHeader: res.headers.get("X-Request-ID"),
-            rawTextHead: text.slice(0, 800),
-            rawTextLength: text.length,
-          });
-          setGenError(
-            `接口返回非 JSON（HTTP ${res.status}）：${text.slice(0, 400)}`,
-          );
-          return;
-        }
-
-        logApiEvent("response", `/api/generate-image HTTP ${res.status}`, {
-          traceId,
-          requestIdHeader: res.headers.get("X-Request-ID"),
-          ok: res.ok,
-          json: summarizeResponseBodyForLog({ ...data } as Record<string, unknown>),
-          rawJsonLength: text.length,
-        });
-
-        if (!res.ok) {
-          logApiEvent("error", `业务错误 HTTP ${res.status}`, {
-            traceId,
-            detail: data.detail,
-            detailFormatted: formatApiDetail(data.detail),
-          });
-          setGenError(
-            formatApiDetail(data.detail) ||
-              `请求失败 HTTP ${res.status}：${text.slice(0, 400)}`,
-          );
-          return;
-        }
-
-        const url = data.url?.trim();
-        if (!url) {
-          logApiEvent("error", "HTTP 2xx 但缺少 url 字段", { traceId, keys: Object.keys(data) });
-          setGenError("后端返回成功，但未包含图片地址 url，请检查网关响应格式。");
-          return;
-        }
-
-        try {
-          const d = await loadImageNaturalSize(url);
-          logApiEvent("response", "生成图 intrinsic 像素", {
-            naturalWidth: d.w,
-            naturalHeight: d.h,
-            aspectRatio: Number((d.w / d.h).toFixed(4)),
-          });
-        } catch {
-          logApiEvent("response", "生成图宽高读取失败，使用默认比例排布", {
-            urlHead: url.slice(0, 160),
-          });
-        }
-
-        const outputMode = props.outputMode ?? "new-layer";
-        const replaceTargetId =
-          outputMode === "replace-selected" &&
-          selected?.type === "image" &&
-          !maskDataURL
-            ? selected.id
-            : null;
-
-        if (replaceTargetId) {
-          replaceImageKeepFrame(replaceTargetId, url);
-          props.onClose();
-          return;
-        }
-
-        const box = await layoutNewAiImageBox(url, selected);
-        const fromRef = selected?.type === "image";
-        const layerName =
-          !fromRef
-            ? "AI 生图"
-            : maskDataURL
-              ? "AI 局部重绘"
-              : "AI 图生图";
-
-        addElement({
-          id: nanoid(),
-          type: "image",
-          name: layerName,
-          ...box,
-          rotation: 0,
-          opacity: 1,
-          visible: true,
-          locked: false,
-          src: url,
-          ...getImageDefaults(),
-        } as CanvasElement);
-
-        props.onClose();
-      } catch (e) {
-        const msg =
-          e instanceof Error ? e.message : String(e);
-        logApiEvent("error", "fetch 异常（网络/超时等）", {
-          traceId,
-          message: msg,
-          stack: e instanceof Error ? e.stack : undefined,
-        });
-        setGenError(
-          `无法连接后端：${msg}。请确认已运行 uvicorn，且 .env 中 API_PORT 与 vite.config 代理一致（默认 13555）。`,
-        );
-      }
+      if (!result.ok) setGenError(result.message);
     } finally {
       setLoading(false);
     }

@@ -270,6 +270,10 @@ select {
   background: #eef5f5;
 }
 
+.konva-wrap--space-pan {
+  cursor: grab;
+}
+
 .right-panel {
   width: 294px;
   background: #ffffff;

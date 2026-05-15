@@ -10,8 +10,8 @@ import {
 } from "react-konva";
 import type Konva from "konva";
 import { nanoid } from "nanoid";
-import { useEditorStore } from "../editor/store";
-import type { ImageElement, ImageMaskData, MaskStroke, MaskTool } from "../editor/types";
+import { useEditorStore } from "../../editor/store";
+import type { ImageElement, ImageMaskData, MaskStroke, MaskTool } from "../../editor/types";
 
 function useImage(src?: string) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);

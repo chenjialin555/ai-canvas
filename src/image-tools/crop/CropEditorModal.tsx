@@ -11,12 +11,12 @@ import {
 import Konva from "konva";
 import type { SceneContext } from "konva/lib/Context";
 import type { Filter } from "konva/lib/Node";
-import { clone, useEditorStore } from "../editor/store";
+import { clone, useEditorStore } from "../../editor/store";
 import type {
   CanvasElement,
   ImageElement,
   ImageMaskShape,
-} from "../editor/types";
+} from "../../editor/types";
 
 function useCropImage(src?: string) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);

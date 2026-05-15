@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from "react-konva";
 import { useEditorStore } from "../../editor/store";
+import {
+  gestureHistoryDragEnd,
+  gestureHistoryDragStart,
+} from "../../editor/commands/interactionGestureHistory";
 import { getWorkflowNodeDefinition } from "../../workflow/nodeRegistry";
 import {
   AI_NODE_HEADER_H,
@@ -316,19 +320,23 @@ export function WorkflowNodeView(props: Props) {
       y={node.y}
       draggable
       onDragStart={() => {
-        useEditorStore.getState().commitHistory();
+        gestureHistoryDragStart();
         useEditorStore.getState().setFloatingToolbarSuppressed(true);
       }}
       onDragEnd={(e) => {
-        useEditorStore.getState().setFloatingToolbarSuppressed(false);
-        updateNode(
-          node.id,
-          {
-            x: e.target.x(),
-            y: e.target.y(),
-          },
-          { history: false },
-        );
+        try {
+          useEditorStore.getState().setFloatingToolbarSuppressed(false);
+          updateNode(
+            node.id,
+            {
+              x: e.target.x(),
+              y: e.target.y(),
+            },
+            { history: false },
+          );
+        } finally {
+          gestureHistoryDragEnd();
+        }
       }}
       onMouseDown={() => setSel([node.id])}
     >
