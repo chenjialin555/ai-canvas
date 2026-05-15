@@ -1,7 +1,7 @@
 import Konva from "konva";
 import { useEditorStore } from "../../editor/store";
 import type { CanvasElement } from "../../editor/types";
-import type { GuideLine } from "../types";
+import { setGuidesRuntime } from "../guides/guidesRuntime";
 import { getSnap } from "./getSnap";
 import {
   gestureHistoryDragEnd,
@@ -10,7 +10,7 @@ import {
   gestureHistoryTransformStart,
 } from "../../editor/commands/interactionGestureHistory";
 
-export function commonProps(element: CanvasElement, setGuides: (g: GuideLine[]) => void) {
+export function commonProps(element: CanvasElement) {
   return {
     id: element.id,
     name: "editable-node",
@@ -60,10 +60,10 @@ export function commonProps(element: CanvasElement, setGuides: (g: GuideLine[]) 
       );
 
       e.target.position({ x: snap.x, y: snap.y });
-      setGuides(snap.guides);
+      setGuidesRuntime(snap.guides);
     },
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
-      setGuides([]);
+      setGuidesRuntime([]);
       useEditorStore.getState().setFloatingToolbarSuppressed(false);
       try {
         const state = useEditorStore.getState();

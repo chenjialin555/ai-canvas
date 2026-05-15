@@ -6,13 +6,11 @@ import { tempWireFromEndpoint } from "../../workflow/utils/unifiedGraph";
 export type TemporaryWorkflowConnectionProps = {
   page: Page;
   workflowConnecting: WorkflowConnectingState;
-  zoom: number;
 };
 
 export function TemporaryWorkflowConnection({
   page,
   workflowConnecting,
-  zoom,
 }: TemporaryWorkflowConnectionProps) {
   if (!workflowConnecting.active || !workflowConnecting.from) return null;
 
@@ -28,10 +26,12 @@ export function TemporaryWorkflowConnection({
       bezier
       points={pts}
       stroke="#42c4c4"
-      strokeWidth={2 / zoom}
-      dash={[8 / zoom, 6 / zoom]}
+      strokeWidth={2}
+      strokeScaleEnabled={false}
+      dash={[8, 6]}
       lineCap="round"
       listening={false}
+      perfectDrawEnabled={false}
     />
   );
 }

@@ -1,5 +1,5 @@
-import type { CanvasElement } from "../../editor/types";
-import type { GuideLine } from "../types";
+import { memo } from "react";
+import { useEditorStore } from "../../editor/store";
 import { ArrowElementNode } from "./ArrowElementNode";
 import { GroupElementNode } from "./GroupElementNode";
 import { ImageElementNode } from "./ImageElementNode";
@@ -7,37 +7,39 @@ import { RectElementNode } from "./RectElementNode";
 import { TextElementNode } from "./TextElementNode";
 
 export type ElementNodeProps = {
-  element: CanvasElement;
-  setGuides: (g: GuideLine[]) => void;
+  elementId: string;
   onOpenCropEditor?: (imageId: string) => void;
 };
 
-export function ElementNode(props: ElementNodeProps) {
-  const { element } = props;
+/** 按 id 订阅单个元素，父级 pan/zoom 变化不会触发本节点重渲染 */
+export const ElementNode = memo(function ElementNode(props: ElementNodeProps) {
+  const element = useEditorStore((s) => {
+    const page = s.pages.find((p) => p.id === s.activePageId);
+    return page?.elements.find((el) => el.id === props.elementId);
+  });
 
-  if (!element.visible) return null;
+  if (!element || !element.visible) return null;
 
   if (element.type === "image") {
     return (
       <ImageElementNode
         element={element}
-        setGuides={props.setGuides}
         onOpenCropEditor={props.onOpenCropEditor}
       />
     );
   }
   if (element.type === "rect") {
-    return <RectElementNode element={element} setGuides={props.setGuides} />;
+    return <RectElementNode element={element} />;
   }
   if (element.type === "text") {
-    return <TextElementNode element={element} setGuides={props.setGuides} />;
+    return <TextElementNode element={element} />;
   }
   if (element.type === "arrow") {
-    return <ArrowElementNode element={element} setGuides={props.setGuides} />;
+    return <ArrowElementNode element={element} />;
   }
   if (element.type === "group") {
-    return <GroupElementNode element={element} setGuides={props.setGuides} />;
+    return <GroupElementNode element={element} />;
   }
 
   return null;
-}
+});

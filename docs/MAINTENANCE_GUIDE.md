@@ -97,11 +97,12 @@ npm run dev          # 同时起 Vite + uvicorn（见 package.json）
 
 ## 7. 画布（Canvas）怎么理解？
 
-- **一个大 Stage**：缩放 `zoom`、平移 `pan` 在 store 里，和 Konva `Stage` 的 `scale` / `position` 对齐。  
-- **几层 Layer**：背景网格、内容（元素 + 工作流节点）、对齐线/框选/Transformer 等（见 `canvas/layers`）。  
+- **一个大 Stage**：缩放 `zoom`、平移 `pan` 在 store 里，和 Konva `Stage` 的 `scale` / `position` 对齐；滚轮/拖画布时优先直接改 Konva，再防抖写回 store（见性能文档）。  
+- **几层 Layer**：`CanvasBackgroundLayer`（网格 + 边）、`CanvasPageContent`（元素 + AI 节点）、`CanvasInteractionLayer`（框选 / Transformer / 临时连线）；对齐线见 `AlignmentGuides` + `guidesRuntime`。  
 - **两类东西叠在一起**：普通 **elements** 和 **aiNodes**（外加连线）。
 
-更细的坐标说明：`docs/guides/debug-canvas-coordinates.md`。
+- 坐标换算：`docs/guides/debug-canvas-coordinates.md`  
+- **性能优化说明（拖动画布为何更丝滑）**：`docs/guides/canvas-performance.md`
 
 ---
 

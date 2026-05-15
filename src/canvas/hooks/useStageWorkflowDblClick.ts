@@ -8,8 +8,6 @@ import { screenToWorld } from "../utils/coordinates";
  */
 export function useStageWorkflowDblClick(
   stageRef: RefObject<Konva.Stage | null>,
-  zoom: number,
-  pan: { x: number; y: number },
 ) {
   function handleStageDblClick(e: Konva.KonvaEventObject<MouseEvent>) {
     const stage = stageRef.current;
@@ -19,7 +17,10 @@ export function useStageWorkflowDblClick(
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
-    const world = screenToWorld(pointer, { zoom, pan });
+    const world = screenToWorld(pointer, {
+      zoom: stage.scaleX(),
+      pan: { x: stage.x(), y: stage.y() },
+    });
     useEditorStore.getState().openWorkflowNodePickerAtWorld(world.x, world.y);
   }
 

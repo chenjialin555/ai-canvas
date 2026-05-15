@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useEditorStore } from "../editor/store";
+import { EMPTY_ELEMENTS } from "../editor/store/shallowEqual";
 import type { CanvasElement } from "../editor/types";
 
 function icon(type: string) {
@@ -12,9 +13,10 @@ function icon(type: string) {
 }
 
 export function LeftSidebar() {
-  const pageElements = useEditorStore(
-    (s) => s.pages.find((p) => p.id === s.activePageId)?.elements ?? [],
-  );
+  const pageElements = useEditorStore((s) => {
+    const page = s.pages.find((p) => p.id === s.activePageId);
+    return page?.elements ?? EMPTY_ELEMENTS;
+  });
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const setSelectedIds = useEditorStore((s) => s.setSelectedIds);
   const updateElement = useEditorStore((s) => s.updateElement);

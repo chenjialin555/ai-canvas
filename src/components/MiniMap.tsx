@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useEditorStore } from "../editor/store";
 
 const STAGE_W_PAD = 260 + 294;
@@ -11,12 +11,38 @@ function stageSize() {
   };
 }
 
-export function MiniMap() {
-  const { getActivePage, pan, zoom, setPan } = useEditorStore();
-  const page = getActivePage();
+export const MiniMap = memo(function MiniMap() {
+  const page = useEditorStore((s) =>
+    s.pages.find((p) => p.id === s.activePageId),
+  );
+  const pan = useEditorStore((s) => s.pan);
+  const zoom = useEditorStore((s) => s.zoom);
+  const setPan = useEditorStore((s) => s.setPan);
+  const suppressed = useEditorStore((s) => s.floatingToolbarSuppressed);
+  const marqueeSelecting = useEditorStore((s) => s.marqueeSelecting);
+
+  const [viewport, setViewport] = useState({ pan, zoom });
+  useEffect(() => {
+    if (suppressed || marqueeSelecting) return;
+    const frame = requestAnimationFrame(() => {
+      setViewport((prev) => {
+        if (
+          prev.pan.x === pan.x &&
+          prev.pan.y === pan.y &&
+          prev.zoom === zoom
+        ) {
+          return prev;
+        }
+        return { pan, zoom };
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pan.x, pan.y, zoom, suppressed, marqueeSelecting]);
+
+  const elements = page?.elements ?? [];
 
   const bounds = useMemo(() => {
-    const visible = page.elements.filter((el) => el.visible);
+    const visible = elements.filter((el) => el.visible);
 
     if (!visible.length) {
       return {
@@ -42,12 +68,15 @@ export function MiniMap() {
       width: maxX - minX + 400,
       height: maxY - minY + 400,
     };
-  }, [page.elements]);
+  }, [elements]);
+
+  if (!page) return null;
 
   const miniW = 180;
   const miniH = 120;
   const scale = Math.min(miniW / bounds.width, miniH / bounds.height);
   const { w: stageW, h: stageH } = stageSize();
+  const { pan: viewPan, zoom: viewZoom } = viewport;
 
   return (
     <div className="minimap">
@@ -66,7 +95,7 @@ export function MiniMap() {
           });
         }}
       >
-        {page.elements
+        {elements
           .filter((el) => el.visible)
           .map((el) => (
             <div
@@ -84,13 +113,13 @@ export function MiniMap() {
         <div
           className="minimap-viewport"
           style={{
-            left: (-pan.x / zoom - bounds.minX) * scale,
-            top: (-pan.y / zoom - bounds.minY) * scale,
-            width: (stageW / zoom) * scale,
-            height: (stageH / zoom) * scale,
+            left: (-viewPan.x / viewZoom - bounds.minX) * scale,
+            top: (-viewPan.y / viewZoom - bounds.minY) * scale,
+            width: (stageW / viewZoom) * scale,
+            height: (stageH / viewZoom) * scale,
           }}
         />
       </div>
     </div>
   );
-}
+});

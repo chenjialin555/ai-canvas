@@ -34,9 +34,16 @@
 | 浮动条错位 | 只算了世界坐标未加容器 offset；或滚动后未更新 `getBoundingClientRect`。 |
 | 与世界不符 | 混用了 `clientX` 与 Stage 内坐标；应用 `screenToWorld` 前确认 `point` 定义与工具函数一致。 |
 
-### 5.1 空格平移
+### 5.1 平移与缩放
 
-按住 **空格** 时：画布区为 `grab` 光标；`Stage` 可拖以平移（`spacePan`），且 **不会** 在空白处开始框选（`useMarqueeSelection` 在 `spacePanActive` 时跳过 `mousedown` 框选逻辑）。松键或窗口 `blur` 会结束该状态。
+| 操作 | 效果 |
+|------|------|
+| **滚轮** | 上下平移画布 |
+| **Shift + 滚轮** | 左右平移画布 |
+| **Ctrl + 滚轮** | 以指针为锚点缩放 |
+| **空格 + 拖动画布** | 平移（`spacePan`）；空白处 **不会** 开始框选 |
+
+实现：`src/canvas/hooks/useImperativeViewport.ts`（`handleWheel`）。松空格或窗口 `blur` 会结束空格平移状态。
 
 ## 6. 建议调试步骤
 

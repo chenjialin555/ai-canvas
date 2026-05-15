@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import { useLayoutEffect, useState } from "react";
+import { memo, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Stage } from "konva/lib/Stage";
 import {
@@ -121,7 +121,7 @@ function toolVisible(
   return false;
 }
 
-export function FloatingToolbar(props: Props) {
+export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const editingTextId = useEditorStore((s) => s.editingTextId);
   const marqueeSelecting = useEditorStore((s) => s.marqueeSelecting);
@@ -310,4 +310,4 @@ export function FloatingToolbar(props: Props) {
   );
 
   return createPortal(bar, document.body);
-}
+});

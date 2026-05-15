@@ -1,9 +1,10 @@
 import type { RefObject } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Konva from "konva";
 import { useEditorStore } from "../../editor/store";
 import type { CanvasElement } from "../../editor/types";
 import { screenToWorld } from "../utils/coordinates";
+import { createRafBatcher } from "../utils/rafBatcher";
 
 type MarqueeRect = {
   visible: boolean;
@@ -15,13 +16,18 @@ type MarqueeRect = {
 
 export type UseMarqueeSelectionArgs = {
   stageRef: RefObject<Konva.Stage | null>;
-  zoom: number;
-  pan: { x: number; y: number };
   /** 用于框选结束时的命中列表（与原先闭包 `elements` 一致） */
   elements: CanvasElement[];
   /** 按住空格平移画布时不应开始框选 */
   spacePanActive: boolean;
 };
+
+function viewportFromStage(stage: Konva.Stage) {
+  return {
+    zoom: stage.scaleX(),
+    pan: { x: stage.x(), y: stage.y() },
+  };
+}
 
 /**
  * 框选 + 工作流连线指针跟随（`mousemove` 内与原先同序）。
@@ -29,12 +35,20 @@ export type UseMarqueeSelectionArgs = {
  */
 export function useMarqueeSelection({
   stageRef,
-  zoom,
-  pan,
   elements,
   spacePanActive,
 }: UseMarqueeSelectionArgs) {
   const setSelectedIds = useEditorStore((s) => s.setSelectedIds);
+
+  const scheduleWorkflowPointer = useMemo(
+    () =>
+      createRafBatcher<{ x: number; y: number }>((world) => {
+        useEditorStore.getState().updateWorkflowConnectingPointer(world.x, world.y);
+      }),
+    [],
+  );
+
+  useEffect(() => () => scheduleWorkflowPointer.cancel(), [scheduleWorkflowPointer]);
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selection, setSelection] = useState<MarqueeRect>({
@@ -67,7 +81,7 @@ export function useMarqueeSelection({
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
-    const world = screenToWorld(pointer, { zoom, pan });
+    const world = screenToWorld(pointer, viewportFromStage(stage));
 
     setIsSelecting(true);
     useEditorStore.getState().setMarqueeSelecting(true);
@@ -91,11 +105,11 @@ export function useMarqueeSelection({
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
-    const world = screenToWorld(pointer, { zoom, pan });
+    const world = screenToWorld(pointer, viewportFromStage(stage));
 
     const st = useEditorStore.getState();
     if (st.workflowConnecting.active) {
-      st.updateWorkflowConnectingPointer(world.x, world.y);
+      scheduleWorkflowPointer({ x: world.x, y: world.y });
     }
 
     if (!isSelecting) return;
@@ -114,7 +128,7 @@ export function useMarqueeSelection({
       if (e.target === stage) {
         const pointer = stage.getPointerPosition();
         if (pointer) {
-          const world = screenToWorld(pointer, { zoom, pan });
+          const world = screenToWorld(pointer, viewportFromStage(stage));
           st.openWorkflowNodePicker(world.x, world.y);
         }
       } else {

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from "react-konva";
 import { useEditorStore } from "../../editor/store";
 import {
@@ -21,13 +21,15 @@ import { PORT_COLORS } from "../../workflow/portColors";
 import type { WorkflowNode, WorkflowNodeDefinition } from "../../workflow/types";
 
 type Props = {
-  node: WorkflowNode;
-  zoom: number;
+  nodeId: string;
 };
 
 const PORT_RADIUS = 6;
 const CARD_RADIUS = 14;
 const CARD_STROKE = 1.5;
+
+/** 仅画布缩得很小时再隐藏节点正文（预览/参数等）；默认 zoom=0.45，若用 0.45 作阈值会「略缩小就整块空白」 */
+const COMPACT_BODY_ZOOM_THRESHOLD = 0.2;
 
 const NODE_STYLE = {
   bg: "#ffffff",
@@ -162,36 +164,52 @@ async function downloadImageFromUrl(url: string, filename: string): Promise<void
   }
 }
 
-export function WorkflowNodeView(props: Props) {
-  const { node, zoom } = props;
-  const def = useMemo(() => getWorkflowNodeDefinition(node.type), [node.type]);
+export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
+  const node = useEditorStore((s) => {
+    const page = s.pages.find((p) => p.id === s.activePageId);
+    return page?.aiNodes.find((n) => n.id === props.nodeId);
+  });
+  const zoom = useEditorStore((s) => s.zoom);
+
+  const def = useMemo(
+    () => (node ? getWorkflowNodeDefinition(node.type) : null),
+    [node?.type],
+  );
   const selected = useEditorStore((s) =>
-    s.selectedWorkflowNodeIds.includes(node.id),
+    node ? s.selectedWorkflowNodeIds.includes(node.id) : false,
   );
   const updateNode = useEditorStore((s) => s.updateWorkflowNode);
   const setSel = useEditorStore((s) => s.setSelectedWorkflowNodeIds);
   const startConn = useEditorStore((s) => s.startWorkflowConnecting);
   const completeConn = useEditorStore((s) => s.completeWorkflowConnectingToInput);
-  const connecting = useEditorStore((s) => s.workflowConnecting);
+  /** 不订阅 pointerX/Y，避免拖线时每帧重渲染全部节点 */
+  const connectingActive = useEditorStore((s) => s.workflowConnecting.active);
+  const connectingDataType = useEditorStore((s) => s.workflowConnecting.dataType);
   const runNode = useEditorStore((s) => s.runWorkflowNode);
   const sendCanvas = useEditorStore((s) => s.sendWorkflowResultToCanvas);
 
-  const nw = Math.max(AI_NODE_MIN_WIDTH, safeDim(node.width, AI_NODE_MIN_WIDTH));
-  const nh = Math.min(
-    AI_NODE_MAX_HEIGHT,
-    Math.max(AI_NODE_MIN_HEIGHT, safeDim(node.height, AI_NODE_MIN_HEIGHT)),
-  );
+  const nw = node
+    ? Math.max(AI_NODE_MIN_WIDTH, safeDim(node.width, AI_NODE_MIN_WIDTH))
+    : AI_NODE_MIN_WIDTH;
+  const nh = node
+    ? Math.min(
+        AI_NODE_MAX_HEIGHT,
+        Math.max(AI_NODE_MIN_HEIGHT, safeDim(node.height, AI_NODE_MIN_HEIGHT)),
+      )
+    : AI_NODE_MIN_HEIGHT;
 
   useLayoutEffect(() => {
+    if (!node) return;
+    const tw = Math.round(nw);
+    const th = Math.round(nh);
     const rw = Math.round(node.width);
     const rh = Math.round(node.height);
-    if (rw !== Math.round(nw) || rh !== Math.round(nh)) {
-      updateNode(node.id, { width: nw, height: nh }, { history: false });
-    }
-  }, [node.id, node.width, node.height, nw, nh, updateNode]);
+    if (rw === tw && rh === th) return;
+    updateNode(node.id, { width: nw, height: nh }, { history: false });
+  }, [node?.id, node?.width, node?.height, nw, nh, updateNode]);
 
-  const previewKey = def.preview?.outputKey ?? "result";
-  const previewOut = node.outputs[previewKey];
+  const previewKey = def?.preview?.outputKey ?? "result";
+  const previewOut = node?.outputs[previewKey];
   const previewUrl =
     previewOut?.type === "image" || previewOut?.type === "mask"
       ? previewOut.url
@@ -199,12 +217,14 @@ export function WorkflowNodeView(props: Props) {
   const previewImg = useHtmlImage(previewUrl);
 
   const paramLines = useMemo(
-    () => formatParamSnippets(def, node.params),
-    [def, node.params],
+    () => (def && node ? formatParamSnippets(def, node.params) : []),
+    [def, node?.params],
   );
 
+  if (!node || !def) return null;
+
   const stroke = selected ? NODE_STYLE.borderSelected : NODE_STYLE.border;
-  const compact = zoom < 0.45;
+  const compact = zoom < COMPACT_BODY_ZOOM_THRESHOLD;
   const zLay = Math.max(0.45, Math.min(zoom, 4));
   const fs = (screenPx: number) =>
     Math.max(10, Math.min(24, screenPx / zLay));
@@ -440,8 +460,8 @@ export function WorkflowNodeView(props: Props) {
               onMouseDown={(e) => {
                 e.cancelBubble = true;
                 if (
-                  connecting.active &&
-                  connecting.dataType === inp.dataType
+                  connectingActive &&
+                  connectingDataType === inp.dataType
                 ) {
                   completeConn({
                     kind: "ai-node",
@@ -452,8 +472,8 @@ export function WorkflowNodeView(props: Props) {
               }}
               onMouseUp={(e) => {
                 if (
-                  connecting.active &&
-                  connecting.dataType === inp.dataType
+                  connectingActive &&
+                  connectingDataType === inp.dataType
                 ) {
                   e.cancelBubble = true;
                   completeConn({
@@ -605,6 +625,18 @@ export function WorkflowNodeView(props: Props) {
         />
       )}
 
+      {compact && node.status === "error" && node.error && (
+        <Text
+          text={node.error.slice(0, 56) + (node.error.length > 56 ? "…" : "")}
+          x={10}
+          y={AI_NODE_HEADER_H + 6}
+          width={nw - 20}
+          fontSize={10}
+          fill={NODE_STYLE.danger}
+          listening={false}
+        />
+      )}
+
       {!compact && def.type === "output-view" && previewUrl && resultLinkY > 22 && (
         <Group>
           <Text
@@ -711,4 +743,4 @@ export function WorkflowNodeView(props: Props) {
       )}
     </Group>
   );
-}
+});

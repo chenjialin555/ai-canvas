@@ -1,11 +1,9 @@
 import { Rect } from "react-konva";
 import type { CanvasElement } from "../../editor/types";
-import type { GuideLine } from "../types";
 import { commonProps } from "./commonProps";
 
 export type RectElementNodeProps = {
   element: Extract<CanvasElement, { type: "rect" }>;
-  setGuides: (g: GuideLine[]) => void;
 };
 
 export function RectElementNode(props: RectElementNodeProps) {
@@ -13,7 +11,7 @@ export function RectElementNode(props: RectElementNodeProps) {
 
   return (
     <Rect
-      {...commonProps(el, props.setGuides)}
+      {...commonProps(el)}
       fill={el.fill}
       cornerRadius={el.radius}
       stroke={el.stroke}

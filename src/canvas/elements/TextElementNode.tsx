@@ -1,21 +1,21 @@
 import { Group, Rect, Text } from "react-konva";
 import { useEditorStore } from "../../editor/store";
 import type { CanvasElement, TextElement } from "../../editor/types";
-import type { GuideLine } from "../types";
 import { commonProps } from "./commonProps";
 
 export type TextElementNodeProps = {
   element: TextElement;
-  setGuides: (g: GuideLine[]) => void;
 };
 
 export function TextElementNode(props: TextElementNodeProps) {
   const el = props.element;
-  const { editingTextId, setEditingTextId, updateElement } = useEditorStore();
+  const editingTextId = useEditorStore((s) => s.editingTextId);
+  const setEditingTextId = useEditorStore((s) => s.setEditingTextId);
+  const updateElement = useEditorStore((s) => s.updateElement);
 
   if (editingTextId === el.id) {
     return (
-      <Group {...commonProps(el, props.setGuides)} draggable={false}>
+      <Group {...commonProps(el)} draggable={false}>
         <Rect
           x={0}
           y={0}
@@ -43,7 +43,7 @@ export function TextElementNode(props: TextElementNodeProps) {
 
   return (
     <Text
-      {...commonProps(el, props.setGuides)}
+      {...commonProps(el)}
       text={el.text}
       fontSize={el.fontSize}
       fontFamily={el.fontFamily}

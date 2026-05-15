@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:api\"",
+    "dev:no-reload": "concurrently \"npm run dev:client:no-reload\" \"npm run dev:api:no-reload\"",
     "dev:client": "vite",
+    "dev:client:no-reload": "DEV_NO_RELOAD=1 vite",
     "dev:api": "sh -c 'set -a; [ -f .env ] && . ./.env; set +a; exec uv run uvicorn backend.app.main:app --host 0.0.0.0 --port ${API_PORT:-13555} --reload'",
+    "dev:api:no-reload": "sh -c 'set -a; [ -f .env ] && . ./.env; set +a; exec uv run uvicorn backend.app.main:app --host 0.0.0.0 --port ${API_PORT:-13555}'",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

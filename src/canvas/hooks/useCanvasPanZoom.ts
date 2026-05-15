@@ -1,12 +1,28 @@
-import type { RefObject } from "react";
+import { useMemo, type RefObject } from "react";
 import Konva from "konva";
 import { useEditorStore } from "../../editor/store";
 import { screenToWorld } from "../utils/coordinates";
+import { createRafBatcher } from "../utils/rafBatcher";
+
+type ViewportUpdate = {
+  zoom: number;
+  pan: { x: number; y: number };
+};
 
 /**
- * 滚轮缩放（以指针为锚点），逻辑与原先 `StageCanvas` 内联实现一致。
+ * 滚轮缩放（以指针为锚点）；pan/zoom 经 RAF 合并，每帧最多写 store 一次。
  */
 export function useCanvasPanZoom(stageRef: RefObject<Konva.Stage | null>) {
+  const scheduleViewport = useMemo(
+    () =>
+      createRafBatcher<ViewportUpdate>(({ zoom, pan }) => {
+        const store = useEditorStore.getState();
+        store.setZoom(zoom);
+        store.setPan(pan);
+      }),
+    [],
+  );
+
   function handleWheel(e: Konva.KonvaEventObject<WheelEvent>) {
     e.evt.preventDefault();
 
@@ -28,10 +44,12 @@ export function useCanvasPanZoom(stageRef: RefObject<Konva.Stage | null>) {
       pan: store.pan,
     });
 
-    store.setZoom(clamped);
-    store.setPan({
-      x: pointer.x - mousePointTo.x * clamped,
-      y: pointer.y - mousePointTo.y * clamped,
+    scheduleViewport({
+      zoom: clamped,
+      pan: {
+        x: pointer.x - mousePointTo.x * clamped,
+        y: pointer.y - mousePointTo.y * clamped,
+      },
     });
   }
 

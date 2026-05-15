@@ -2,14 +2,12 @@ import type { RefObject } from "react";
 import { useEffect } from "react";
 import Konva from "konva";
 import { useEditorStore } from "../../editor/store";
-import type { CanvasElement } from "../../editor/types";
 import { styleRotaterAnchor } from "../utils/transformerAnchors";
 
 type UseStageTransformerArgs = {
   stageRef: RefObject<Konva.Stage | null>;
   transformerRef: RefObject<Konva.Transformer | null>;
   selectedIds: string[];
-  elements: CanvasElement[];
   editingTextId: string | null;
   selectionHasGroup: boolean;
 };
@@ -21,7 +19,6 @@ export function useStageTransformer({
   stageRef,
   transformerRef,
   selectedIds,
-  elements,
   editingTextId,
   selectionHasGroup,
 }: UseStageTransformerArgs) {
@@ -45,7 +42,7 @@ export function useStageTransformer({
     tr.nodes(nodes);
     tr.rotateEnabled(!selectionHasGroup);
     tr.getLayer()?.batchDraw();
-  }, [stageRef, transformerRef, selectedIds, elements, editingTextId, selectionHasGroup]);
+  }, [stageRef, transformerRef, selectedIds, editingTextId, selectionHasGroup]);
 
   useEffect(() => {
     const tr = transformerRef.current;
@@ -75,5 +72,5 @@ export function useStageTransformer({
       tr.off("transformstart", onStart);
       tr.off("transformend", onEnd);
     };
-  }, [transformerRef, selectedIds, elements, editingTextId]);
+  }, [transformerRef, selectedIds, editingTextId]);
 }

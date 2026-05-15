@@ -10,7 +10,7 @@
  * 本文件主要是「把子组件拼起来 + 把画布/工具条/右键菜单的回调接到 store 或弹窗」，
  * 具体画布交互在 StageCanvas，具体弹窗内容在 EditorModals。
  */
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import Konva from "konva";
 import { ContextMenu } from "../components/ContextMenu";
 import { exportCroppedImageAsPNG } from "../editor/export";
@@ -36,10 +36,14 @@ export default function App() {
   const project = useProjectImportExport();
   const { exportStage } = useStageExport(stageRef);
 
-  const store = useEditorStore();
-  const page = store.getActivePage();
-  // 当前「主选中」元素（多选时 ContextMenu 等仍按第一个 id 处理）
-  const selected = page.elements.find((el) => el.id === store.selectedIds[0]);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const page = useEditorStore((s) =>
+    s.pages.find((p) => p.id === s.activePageId),
+  );
+  const selected = useMemo(
+    () => page?.elements.find((el) => el.id === selectedIds[0]),
+    [page?.elements, selectedIds],
+  );
 
   /** 右键菜单操作后统一关闭菜单（避免每个 onXxx 重复写 setContextMenu） */
   const closeContextMenu = () =>
@@ -52,7 +56,7 @@ export default function App() {
     message: string,
     durationMs: number,
   ) => {
-    store.openWorkflowNodePickerAtWorld(worldX, worldY);
+    useEditorStore.getState().openWorkflowNodePickerAtWorld(worldX, worldY);
     if (modals.toolbarToastTimerRef.current) {
       window.clearTimeout(modals.toolbarToastTimerRef.current);
     }
@@ -93,11 +97,11 @@ export default function App() {
           onOpenCropEditor={(id) => modals.setCropEditorImageId(id)}
           onContextMenu={(params) => {
             // 右键目标若未在选中集内，先选中再弹菜单（x/y 为屏幕 client 坐标）
-            if (
-              params.targetId &&
-              !store.selectedIds.includes(params.targetId)
-            ) {
-              store.setSelectedIds([params.targetId]);
+            if (params.targetId) {
+              const st = useEditorStore.getState();
+              if (!st.selectedIds.includes(params.targetId)) {
+                st.setSelectedIds([params.targetId]);
+              }
             }
 
             modals.setContextMenu({
@@ -110,7 +114,7 @@ export default function App() {
           onFloatingCrop={(id) => modals.setCropEditorImageId(id)}
           onFloatingMask={(id) => modals.setMaskEditorImageId(id)}
           onFloatingOpenAI={({ imageId, mode }) => {
-            store.setSelectedIds([imageId]);
+            useEditorStore.getState().setSelectedIds([imageId]);
             modals.setAiOutputMode(mode);
             modals.setAiOpen(true);
           }}
@@ -156,11 +160,11 @@ export default function App() {
             selected={selected}
             onClose={closeContextMenu}
             onCopy={() => {
-              store.copy();
+              useEditorStore.getState().copy();
               closeContextMenu();
             }}
             onPaste={() => {
-              store.paste();
+              useEditorStore.getState().paste();
               closeContextMenu();
             }}
             onExportPng={() => {
@@ -170,28 +174,28 @@ export default function App() {
               closeContextMenu();
             }}
             onDelete={() => {
-              store.removeSelected();
+              useEditorStore.getState().removeSelected();
               closeContextMenu();
             }}
             onBringToFront={() => {
-              if (selected) store.bringToFront(selected.id);
+              if (selected) useEditorStore.getState().bringToFront(selected.id);
               closeContextMenu();
             }}
             onSendToBack={() => {
-              if (selected) store.sendToBack(selected.id);
+              if (selected) useEditorStore.getState().sendToBack(selected.id);
               closeContextMenu();
             }}
             onGroup={() => {
-              store.groupSelected();
+              useEditorStore.getState().groupSelected();
               closeContextMenu();
             }}
             onUngroup={() => {
-              store.ungroupSelected();
+              useEditorStore.getState().ungroupSelected();
               closeContextMenu();
             }}
             onLock={() => {
               if (selected) {
-                store.updateElement(selected.id, {
+                useEditorStore.getState().updateElement(selected.id, {
                   locked: !selected.locked,
                 } as Partial<CanvasElement>);
               }
@@ -199,7 +203,7 @@ export default function App() {
             }}
             onHide={() => {
               if (selected) {
-                store.updateElement(selected.id, {
+                useEditorStore.getState().updateElement(selected.id, {
                   visible: false,
                 } as Partial<CanvasElement>);
               }
@@ -224,7 +228,7 @@ export default function App() {
             }}
             onClearMask={() => {
               if (selected?.type === "image" && selected.aiMask) {
-                store.clearImageAIMask(selected.id);
+                useEditorStore.getState().clearImageAIMask(selected.id);
               }
               closeContextMenu();
             }}

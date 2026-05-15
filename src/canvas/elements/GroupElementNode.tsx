@@ -1,7 +1,9 @@
 import { Arrow, Group, Image as KonvaImage, Rect, Text } from "react-konva";
+import { useShallow } from "zustand/react/shallow";
 import { useEditorStore } from "../../editor/store";
+import { EMPTY_ELEMENTS } from "../../editor/store/shallowEqual";
 import type { CanvasElement, ImageElement } from "../../editor/types";
-import type { GuideLine } from "../types";
+import { setGuidesRuntime } from "../guides/guidesRuntime";
 import { getSnap } from "./getSnap";
 import { useCanvasImage } from "./useCanvasImage";
 import {
@@ -131,15 +133,17 @@ function GroupChildImage(props: {
 
 export type GroupElementNodeProps = {
   element: Extract<CanvasElement, { type: "group" }>;
-  setGuides: (g: GuideLine[]) => void;
 };
 
 export function GroupElementNode(props: GroupElementNodeProps) {
   const g = props.element;
-  const children = useEditorStore((st) => {
-    const pg = st.pages.find((p) => p.id === st.activePageId);
-    return pg?.elements.filter((c) => c.parentId === g.id) ?? [];
-  });
+  const children = useEditorStore(
+    useShallow((st) => {
+      const pg = st.pages.find((p) => p.id === st.activePageId);
+      if (!pg) return EMPTY_ELEMENTS;
+      return pg.elements.filter((c) => c.parentId === g.id);
+    }),
+  );
 
   const selectedIds = useEditorStore((s) => s.selectedIds);
 
@@ -180,10 +184,10 @@ export function GroupElementNode(props: GroupElementNodeProps) {
           moving,
           pg.elements.filter((el) => !state.selectedIds.includes(el.id)),
         );
-        props.setGuides(snap.guides);
+        setGuidesRuntime(snap.guides);
       }}
       onDragEnd={(e) => {
-        props.setGuides([]);
+        setGuidesRuntime([]);
         useEditorStore.getState().setFloatingToolbarSuppressed(false);
         try {
           const st = useEditorStore.getState();

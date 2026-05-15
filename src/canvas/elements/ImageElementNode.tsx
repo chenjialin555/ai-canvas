@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Group, Image as KonvaImage, Rect, Text } from "react-konva";
 import Konva from "konva";
 import type { SceneContext } from "konva/lib/Context";
@@ -6,7 +6,6 @@ import type { Filter } from "konva/lib/Node";
 import { useEditorStore } from "../../editor/store";
 import type { ImageElement, ImageMaskData } from "../../editor/types";
 import { exportMaskToDataURL } from "../../image-tools/mask/maskRasterize";
-import type { GuideLine } from "../types";
 import { commonProps } from "./commonProps";
 import { useCanvasImage } from "./useCanvasImage";
 
@@ -123,17 +122,16 @@ function AIMaskOverlay(props: {
 
 export type ImageElementNodeProps = {
   element: ImageElement;
-  setGuides: (g: GuideLine[]) => void;
   onOpenCropEditor?: (imageId: string) => void;
 };
 
-export function ImageElementNode(props: ImageElementNodeProps) {
+export const ImageElementNode = memo(function ImageElementNode(
+  props: ImageElementNodeProps,
+) {
   const image = useCanvasImage(props.element.src);
   const element = props.element;
 
-  const { selectedIds, setSelectedIds } = useEditorStore();
-
-  const selected = selectedIds.includes(element.id);
+  const isSelected = useEditorStore((s) => s.selectedIds.includes(element.id));
 
   const baseScale = image
     ? Math.max(element.width / image.width, element.height / image.height)
@@ -184,24 +182,27 @@ export function ImageElementNode(props: ImageElementNodeProps) {
 
   return (
     <Group
-      {...commonProps(element, props.setGuides)}
+      {...commonProps(element)}
       draggable={!element.locked}
       onClick={(e) => {
         e.cancelBubble = true;
-
+        const state = useEditorStore.getState();
+        if (state.editingTextId) return;
         if (e.evt.shiftKey) {
-          if (selectedIds.includes(element.id)) {
-            setSelectedIds(selectedIds.filter((id) => id !== element.id));
+          if (state.selectedIds.includes(element.id)) {
+            state.setSelectedIds(
+              state.selectedIds.filter((id) => id !== element.id),
+            );
           } else {
-            setSelectedIds([...selectedIds, element.id]);
+            state.setSelectedIds([...state.selectedIds, element.id]);
           }
         } else {
-          setSelectedIds([element.id]);
+          state.setSelectedIds([element.id]);
         }
       }}
       onDblClick={(e) => {
         e.cancelBubble = true;
-        setSelectedIds([element.id]);
+        useEditorStore.getState().setSelectedIds([element.id]);
         props.onOpenCropEditor?.(element.id);
       }}
     >
@@ -261,7 +262,7 @@ export function ImageElementNode(props: ImageElementNodeProps) {
           </Group>
         )}
 
-        {selected && (
+        {isSelected && (
           <Rect
             x={0}
             y={0}
@@ -287,4 +288,4 @@ export function ImageElementNode(props: ImageElementNodeProps) {
       />
     </Group>
   );
-}
+});

@@ -1,11 +1,20 @@
+import { useEffect, useState } from "react";
 import { Line } from "react-konva";
+import {
+  getGuidesSnapshot,
+  subscribeGuides,
+} from "../guides/guidesRuntime";
 import type { GuideLine } from "../types";
 
-export type AlignmentGuidesProps = {
-  guides: GuideLine[];
-};
+export function AlignmentGuides() {
+  const [guides, setGuides] = useState<GuideLine[]>(() => getGuidesSnapshot());
 
-export function AlignmentGuides({ guides }: AlignmentGuidesProps) {
+  useEffect(() => {
+    return subscribeGuides(() => {
+      setGuides(getGuidesSnapshot());
+    });
+  }, []);
+
   return (
     <>
       {guides.map((guide, index) => (
@@ -20,6 +29,7 @@ export function AlignmentGuides({ guides }: AlignmentGuidesProps) {
           strokeWidth={1}
           dash={[6, 4]}
           listening={false}
+          perfectDrawEnabled={false}
         />
       ))}
     </>
