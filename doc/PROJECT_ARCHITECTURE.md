@@ -1,7 +1,7 @@
 # AI Canvas 项目架构学习文档
 
 > 面向：**React + Konva + Zustand + FastAPI** 全栈维护者。  
-> 目标：系统理解定位、数据流、坐标与 AI 链路，并能安全扩展。
+> 目标：系统理解定位、数据流、坐标、**画布 AI 节点工作流**与单步生图链路，并能安全扩展。
 
 ---
 
@@ -19,10 +19,11 @@
 10. [AI 生图调用流程](#10-ai-生图调用流程)
 11. [Python 后端](#11-python-后端)
 12. [OSS 上传](#12-oss-上传)
-13. [保存与加载 JSON](#13-保存与加载-json)
+13. [保存与加载 JSON / localStorage](#13-保存与加载-json--localstorage)
 14. [典型用户操作数据流](#14-典型用户操作数据流)
 15. [容易混淆的问题](#15-容易混淆的问题)
-16. [如何扩展成 AI 工作流](#16-如何扩展成-ai-工作流)
+16. [如何扩展](#16-如何扩展)
+17. [画布 AI 节点工作流（当前实现）](#17-画布-ai-节点工作流当前实现)
 
 ---
 
@@ -31,8 +32,8 @@
 | 维度 | 说明 |
 |------|------|
 | **产品形态** | 浏览器内的 **可视化画布编辑器**（类 Figma 的简化版）：多页面、图层、选择/变换、对齐、组合、小地图、素材库。 |
-| **差异化能力** | 集成 **AI 生图 / 图生图 / 局部重绘（inpaint）**：前端维护 `ImageElement` 与笔刷蒙版数据，经 FastAPI 归一化（含 OSS）后调用多家模型网关。 |
-| **数据真相源** | 前端 **Zustand + Immer** 持有的 `pages[].elements[]`；持久化以 **localStorage** 为主，另支持 **导出/导入 JSON** 与 **任意 URL 的远程保存/加载**（由你方服务端实现契约）。 |
+| **差异化能力** | ① **单步 AI 弹窗**：生图 / 图生图 / 局部重绘（inpaint），`ImageElement` + 笔刷蒙版 → FastAPI → OSS → 多模型网关。② **同一画布上的 AI 节点图**：`Page.aiNodes` + `Page.edges`，端口连线、逐节点运行（`POST /api/workflow/run-node`）或纯前端同步类节点。 |
+| **数据真相源** | 前端 **Zustand + Immer** 持有的 `pages[]`（每页含 `elements`、`aiNodes`、`edges`）；持久化以 **localStorage**（防抖 + 配额保护）为主，另支持 **导出/导入 `ProjectJSON`** 与 **远程 save/load**（自备契约）。 |
 | **运行时** | `npm run dev` 通过 **concurrently** 同时起 **Vite（5173）** 与 **uvicorn（默认 13555）**；Vite 将 `/api` **代理**到后端，避免 CORS 与端口混用问题。 |
 
 ```mermaid
@@ -49,10 +50,12 @@ flowchart LR
     FastAPI["FastAPI"]
     OSS["阿里云 OSS"]
     GW["Comfly / Dashscope 等网关"]
+    WF["workflow executors"]
   end
   browser -->|"/api/* 代理"| FastAPI
   FastAPI --> OSS
   FastAPI --> GW
+  FastAPI --> WF
 ```
 
 ---
@@ -66,7 +69,7 @@ flowchart LR
 | React | 19.x | UI 与状态订阅 |
 | TypeScript | ~5.6 | 类型安全 |
 | Vite | 6.x | 开发与构建；`/api` 代理 |
-| Konva / react-konva | 9.x / 19.x | 2D 画布、变换器、滤镜、裁剪预览 |
+| Konva / react-konva | 9.x / 19.x | 2D 画布、变换器、滤镜、裁剪预览、**工作流节点 Konva 视图** |
 | Zustand | 5.x | 全局编辑器状态 |
 | Immer (`produce`) | 10.x | 不可变式深层更新 |
 | nanoid | 5.x | id 生成 |
@@ -75,7 +78,7 @@ flowchart LR
 
 | 技术 | 用途 |
 |------|------|
-| FastAPI | HTTP API：`/api/health`、`/api/models`、`/api/upload-image-url`、`/api/generate-image` |
+| FastAPI | HTTP API：`/api/health`、`/api/models`、`/api/upload-image-url`、`/api/generate-image`、**`/api/workflow/run-node`** |
 | httpx | 同步 HTTP 客户端，调用外部图生图网关（带重试） |
 | dashscope | 通义 Qwen 等调用路径 |
 | alibabacloud-oss-v2 | 将 dataURL 上传 OSS，返回公网 URL |
@@ -90,18 +93,25 @@ flowchart LR
 |------|------|
 | `src/main.tsx` | React 入口 |
 | `src/App.tsx` | 应用壳：顶栏、侧栏、模态框开关、`stageRef`、导入导出入口 |
-| `src/components/StageCanvas.tsx` | **主画布**：Stage/Layer、元素渲染、Transformer、吸附、框选、右键回调 |
+| `src/components/StageCanvas.tsx` | **主画布**：`Stage` + **3 个 `Layer`**（背景网格与边、元素+端口+AI 节点、对齐线/框选/Transformer/临时连线）；元素与 **工作流连线/端口** 事件 |
+| `src/components/workflow/WorkflowNodeView.tsx` | 单个 **AI 功能节点** 的 Konva 表现（预览、端口、运行条、拖拽） |
 | `src/components/FloatingToolbar.tsx` | 选中元素上方的 **快捷工具条**（Portal + 世界坐标 AABB） |
 | `src/components/CropEditorModal.tsx` | **裁剪编辑器**（独立 Konva 场景，写回 `cropOffset*` / `cropScale` / `cropRotation` / flip） |
 | `src/components/MaskEditorModal.tsx` | **AI 蒙版笔刷**编辑器，写回 `aiMask` |
-| `src/components/AiGenerateModal.tsx` | **AI 生图**：组装 payload → `POST /api/generate-image` → 新图层或替换 |
+| `src/components/AiGenerateModal.tsx` | **单步 AI 生图**：组装 payload → `POST /api/generate-image` → 新图层或替换 |
 | `src/components/AiChatPanel.tsx` | 侧栏 AI 对话/附件（与画布松耦合） |
 | `src/components/LibraryPanel.tsx` | 素材库 |
 | `src/components/MiniMap.tsx` | 小地图导航 |
 | `src/components/ContextMenu.tsx` | 右键菜单 |
 | `src/components/QuickToolbarSettings.tsx` | 快捷条按钮配置 |
-| `src/editor/types.ts` | **核心类型**：元素、页面、蒙版、ProjectJSON |
-| `src/editor/store.ts` | **Zustand Store**：页面、选择、历史、剪贴板、图层顺序、AI 蒙版 API |
+| `src/workflow/types.ts` | **工作流类型**：`WorkflowNode`、`NodeEdge`、`NodeEndpoint`、`WorkflowNodeDefinition` 等 |
+| `src/workflow/nodeRegistry.ts` | 节点类型 **注册表** `WORKFLOW_NODE_REGISTRY` |
+| `src/workflow/nodes/*.ts` | 各节点 **定义**（ports、params、`executor` id、`showRunBar` 等） |
+| `src/workflow/utils/createNode.ts` | 按定义创建运行时 `WorkflowNode` |
+| `src/workflow/utils/runPayload.ts` | 运行前 **序列化上游输入**（`serializeWorkflowInputsForApi`） |
+| `src/workflow/utils/unifiedGraph.ts` | 边与端口解析、迁移旧 `Page.workflow`、兼容输入等 |
+| `src/editor/types.ts` | **核心类型**：`Page`（含 `aiNodes`/`edges`）、`EditorState`、`ProjectJSON`、元素联合类型 |
+| `src/editor/store.ts` | **Zustand Store**：页面、选择、历史、剪贴板、图层顺序、AI 蒙版、**工作流 CRUD / 连线 / `runWorkflowNode`**、`localStorage` 订阅 |
 | `src/editor/export.ts` | JSON 下载/读取、滤镜与 clipPath、`exportCroppedImageAsPNG` |
 | `src/editor/mask.ts` | 蒙版 strokes → PNG dataURL |
 | `src/editor/quickTools.ts` | 快捷条工具 id 与白名单 |
@@ -109,9 +119,12 @@ flowchart LR
 | `src/lib/apiDebug.ts` / `apiFormat.ts` | 前端 API 日志与错误格式化 |
 | `backend/main.py` | 兼容入口，转发 `backend.app.main` |
 | `backend/app/main.py` | FastAPI 应用工厂：CORS、中间件、挂载 `/api` |
-| `backend/app/api/v1/*.py` | 路由：`generation`、`upload`、`models`（health + models 列表） |
-| `backend/app/schemas/` | Pydantic：`generation.py`、`upload.py` |
-| `backend/app/providers/` | 各厂商适配（payload + HTTP / Dashscope），`registry.py` 汇总 |
+| `backend/app/api/v1/*.py` | 路由：`generation`、`upload`、`models`、**`workflow`** |
+| `backend/app/schemas/workflow.py` | `RunNodeRequest` / `RunNodeResponse` |
+| `backend/app/services/workflow_service.py` | 按 `nodeType` 选 **executor** 并执行 |
+| `backend/app/executors/*.py` | **工作流节点执行器**（与前端 `WorkflowNodeDefinition.executor` 对齐） |
+| `backend/app/schemas/` | Pydantic：`generation.py`、`upload.py` 等 |
+| `backend/app/providers/` | 单步生图各厂商适配，`registry.py` 汇总 |
 | `backend/app/services/` | **业务编排**：`generation_service`、`upload_service` |
 | `backend/app/storage/oss.py` | OSS 与 `ensure_url` |
 | `backend/app/core/settings.py` | **Pydantic Settings**：环境变量、CORS、日志路径等 |
@@ -124,13 +137,13 @@ flowchart LR
 
 ## 4. 核心数据模型
 
-### 4.1 元素类型（ discriminated union ）
+### 4.1 元素类型（discriminated union）
 
 定义见 `src/editor/types.ts`。所有元素共享 `BaseElement`：`id`、`name`、`type`、`x/y/width/height`、`rotation`、`opacity`、`visible`、`locked`、`parentId?`。
 
 | `type` | 说明 | 特有字段（摘要） |
 |--------|------|------------------|
-| `image` | 位图图层 | `src`；**裁剪**：`cropOffsetX/Y`、`cropScale`、`cropRotation`；**展示蒙版**：`maskShape`、`cornerRadius`；**滤镜**；**AI 蒙版**：`aiMask` |
+| `image` | 位图图层 | `src`；**裁剪**：`cropOffsetX/Y`、`cropScale`、`cropRotation`；**展示蒙版**：`maskShape`、`cornerRadius`；**滤镜**；**AI 蒙版**：`aiMask`；可选 **`nodeMeta`**：声明图片作为「图像节点」对外暴露的 **输出端口**（`image` / `mask`），供连线 UI 使用 |
 | `rect` | 矩形 | `fill`、`radius`、`stroke*` |
 | `text` | 文字 | `text`、`fontSize`、`fontFamily`、`align` 等 |
 | `arrow` | 箭头 | `stroke`、`strokeWidth` |
@@ -142,16 +155,28 @@ flowchart LR
 erDiagram
   ProjectJSON ||--o{ Page : pages
   Page ||--o{ CanvasElement : elements
+  Page ||--o{ WorkflowNode : aiNodes
+  Page ||--o{ NodeEdge : edges
   ImageElement ||--o| ImageMaskData : aiMask
   ImageMaskData ||--o{ MaskStroke : strokes
 ```
 
 | 类型 | 字段要点 |
 |------|-----------|
-| `Page` | `id`、`name`、`elements: CanvasElement[]` |
-| `ProjectJSON` | `version`（如 `"2.0.0"`）、`savedAt`、`pages`、`activePageId` |
+| `Page` | `id`、`name`、`elements: CanvasElement[]`、**`aiNodes: WorkflowNode[]`**、**`edges: NodeEdge[]`**；旧字段 **`workflow?: WorkflowGraph`** 已废弃，由 `migratePage` 迁到 `aiNodes`/`edges` |
+| `ProjectJSON` | `version`（如 `"2.0.0"`）、`savedAt`、`pages`（已含各页的 `aiNodes`/`edges`）、`activePageId` |
 | `ImageMaskData` | `version`、`width`、`height`、与画布元素框一致的逻辑分辨率、`strokes[]` |
 | `MaskStroke` | `tool: brush|eraser`、`points`（扁平 `[x0,y0,x1,y1,...]`）、`color`、`size`、`opacity`、`hardness` |
+
+### 4.3 画布 AI 工作流相关类型（`src/workflow/types.ts`）
+
+| 类型 | 含义 |
+|------|------|
+| `WorkflowNode` | 画布上 AI 功能节点实例：`id`、`type`、`title`、`x/y/width/height`、`status`、`params`、`outputs`（如 `image` 的 `url`）、`error?` 等 |
+| `NodeEndpoint` | 连线端点：**图片元素端口** `kind: "image-element"`（`image` \| `mask`）或 **AI 节点端口** `kind: "ai-node"` |
+| `NodeEdge` | 有向边：`from` → `to` 均为 `NodeEndpoint`，带 `dataType`（与端口类型一致） |
+| `WorkflowNodeDefinition` | 注册表中的 **类型定义**：`inputs`/`outputs` 端口、`params`、`executor`（后端 executor id 或 `"none"`）、`showRunBar` 等 |
+| `EditorMode` | 当前仅 **`"canvas"`**（统一画布，已无独立「纯工作流页」模式） |
 
 ---
 
@@ -159,22 +184,35 @@ erDiagram
 
 ### 5.1 `EditorState` 与 Store 扩展
 
-`EditorState`（`types.ts`）描述 **可持久化/可导出** 的核心：`pages`、`activePageId`、`selectedIds`、`zoom`、`pan`、`tool`、`editingTextId`、`quickToolbarConfig`。
+`EditorState`（`types.ts`）除画布与视口外，还包含 **工作流 UI 状态**：
 
-`store.ts` 中的 `Store` 额外包含：
+| 字段 | 作用 |
+|------|------|
+| `editorMode` | 恒为 `canvas`（保留字段，便于将来扩展） |
+| `selectedWorkflowNodeIds` | 多选 AI 节点 id；与 `selectedIds` 互斥策略见 store（选节点时常清空元素选区） |
+| `workflowConnecting` | 从端口拖线中的临时状态（起点端点、指针世界坐标、`dataType`） |
+| `workflowNodePicker` | 松手后弹出 **创建节点** 选择器的位置与上下文 |
+
+`store.ts` 中 `Store` 另含非持久化 UI 标志、历史、剪贴板及大量方法，摘要：
 
 | 字段 / 方法 | 作用 |
 |-------------|------|
 | `marqueeSelecting` | 框选中：用于隐藏浮动条 |
-| `floatingToolbarSuppressed` | 拖拽/变换时抑制浮动条 |
-| `historyPast` / `historyFuture` | 撤销重做（快照为 `pages`、`activePageId`、`selectedIds`、`zoom`、`pan`） |
-| `clipboard` | 复制粘贴 |
-| `commitHistory` | 在变更前推入快照（注意：`updateElement` 默认会先 `commitHistory`） |
+| `floatingToolbarSuppressed` | 拖动画布 / 元素 / 变换时抑制浮动条 |
+| `historyPast` / `historyFuture` | 撤销重做；快照类型 `Snapshot` 含 **`pages`、`activePageId`、`selectedIds`、`selectedWorkflowNodeIds`、`zoom`、`pan`** |
+| `clipboard` | 复制粘贴（画布元素或工作流子图，见 `EditorClipboard`） |
+| `commitHistory` | 推入快照；`updateElement` 等默认会先 `commitHistory`（可用 `options.history: false` 关闭） |
 | `replaceImageKeepFrame` | 换 `src` 并重置裁剪与 `aiMask` |
 | `setImageAIMask` / `clearImageAIMask` | AI 蒙版写入 |
-| `exportProjectJSON` / `loadProjectJSON` | 完整工程序列化 |
-| `saveLocal` | 写 localStorage（也被 `subscribe` 自动同步） |
-| `saveRemote` / `loadRemote` | `POST`/`GET` 任意 URL 的 JSON 契约 |
+| **`addWorkflowNode` / `updateWorkflowNode` / `removeWorkflowNode`** | AI 节点 CRUD |
+| **`addWorkflowEdge` / `removeWorkflowEdge`** | 统一图边 |
+| **`startWorkflowConnecting` / `updateWorkflowConnectingPointer` / `cancelWorkflowConnecting`** | 连线交互 |
+| **`createWorkflowNodeFromPicker`** | 从选择器创建节点并自动接好一条入边（若兼容） |
+| **`runWorkflowNode`** | 运行节点：`output-view` 等 **纯前端** 分支；否则 `serializeWorkflowInputsForApi` → **`POST /api/workflow/run-node`** → 写回 `outputs` |
+| **`sendWorkflowResultToCanvas`** | 将节点某路 `image` 输出落成画布 `ImageElement` |
+| `exportProjectJSON` / `loadProjectJSON` | 完整工程（**含每页 `aiNodes`/`edges`**）；`load` 时 `migratePage` |
+| `saveLocal` | 立即写 `localStorage`（**未**走防抖与瘦身逻辑；见 [§13](#13-保存与加载-json--localstorage)） |
+| `saveRemote` / `loadRemote` | `fetch` POST/GET `ProjectJSON` |
 
 ### 5.2 历史记录边界
 
@@ -189,11 +227,15 @@ stateDiagram-v2
   end note
 ```
 
-**要点**：`renamePage`、部分 UI 标志位可能 **不** 入历史；大操作前确认是否应 `commitHistory`，避免「撤销一步跳太多」。
+**要点**：`renamePage`、部分 UI 标志位可能 **不** 入历史；工作流节点在 **`runWorkflowNode` 成功/失败收尾** 或 **`output-view` 同步完成** 时会 `commitHistory`，而运行中的 `running` 更新通常 `history: false`。
 
-### 5.3 自动持久化
+### 5.3 自动持久化（`localStorage`）
 
-`useEditorStore.subscribe` 在每次状态变化后将 `pages`、`activePageId`、`zoom`、`pan`、`quickToolbarConfig` 写入 `localStorage`（键名 `STORAGE_KEY`，见 `store.ts`）。**`selectedIds` 默认不落盘**（每次加载清空选择）。
+- **键名**：`STORAGE_KEY` = `AI_CANVAS_PRO_PROJECT_V2`（`store.ts`）。
+- **触发**：`useEditorStore.subscribe` 在 **每次 `setState` 后** 调度一次写入（**防抖约 600ms**），合并短时间内的连续更新（框选、抑制浮动条等），避免同步 `JSON.stringify` 整包 `pages` 造成卡顿。
+- **写入字段**：`pages`、`activePageId`、`zoom`、`pan`、`quickToolbarConfig`、`editorMode`。
+- **配额与异常**：`tryWriteProjectToLocalStorage` 内 **`try/catch`**；若 `QuotaExceededError`，对 **克隆体** 中长 **`data:`** URL（画布大图、节点 `image`/`mask` 输出）按阈值 **替换为 1×1 占位 PNG** 后分级重试，**不向业务逻辑抛异常**（避免拖拽/连线因 `setItem` 失败而卡死）。
+- **选择状态**：`selectedIds` / `selectedWorkflowNodeIds` **默认不落盘**（加载后清空或按需初始化）。
 
 ---
 
@@ -202,11 +244,12 @@ stateDiagram-v2
 | 组件 | 与 Store 的关系 | 主要职责 |
 |------|-----------------|----------|
 | `App` | `useEditorStore()` 全量或按需订阅 | 布局、打开各 Modal、文件 input、导出整 Stage PNG、桥接 `stageRef` |
-| `StageCanvas` | `zoom`/`pan`/`selectedIds`/元素列表等 | **唯一主舞台**；Konva 事件 → `updateElement` / `setSelectedIds`；Transformer；组合子节点坐标 |
+| `StageCanvas` | `zoom`/`pan`/`selectedIds`/页面数据/连线状态等 | **唯一主舞台**；元素与 **边、图片端口 overlay、工作流节点**；框选、Transformer、右键、**临时连线**（贝塞尔预览线 `listening={false}`） |
+| `WorkflowNodeView` | 读 `node`、写 `updateWorkflowNode`、触发 `runWorkflowNode` 等 | 单节点 UI：端口、预览、运行按钮、Konva 拖拽（**不在 `onDragMove` 每帧写回 store**，避免与 Konva 拖拽打架） |
 | `FloatingToolbar` | 选中元素、`zoom`/`pan`、`marqueeSelecting`、`floatingToolbarSuppressed` | HTML 浮层；世界坐标 AABB → 屏幕定位 |
 | `CropEditorModal` | `updateElement`、`clone` | 裁剪 UI；写回图片专用字段 |
 | `MaskEditorModal` | `setImageAIMask` | 笔刷编辑 `aiMask.strokes` |
-| `AiGenerateModal` | `getActivePage`、`selectedIds`、`addElement`、`replaceImageKeepFrame` | 组装请求、处理响应与布局 |
+| `AiGenerateModal` | `getActivePage`、`selectedIds`、`addElement`、`replaceImageKeepFrame` | **单步**生图请求与落版 |
 | `MiniMap` | 读页面与视口 | 缩略导航 |
 | `LibraryPanel` | 添加预设图等 | 素材入口 |
 
@@ -220,9 +263,9 @@ stateDiagram-v2
 
 | 层级 | 含义 | 典型用途 |
 |------|------|----------|
-| **世界坐标（World）** | 与 `CanvasElement.x/y/width/height` 一致；元素逻辑布局单位 | Store、对齐、导出 JSON、浮动条 AABB 计算 |
-| **舞台内容坐标** | `Stage` 子 Layer 在 **应用了 `scaleX/Y=zoom` 与 `x/y=pan`** 之后的坐标系 | Konva 内部节点 `x,y` 与 Transformer |
-| **屏幕 / 客户端坐标** | 浏览器视口、`getBoundingClientRect` | 右键菜单、`FloatingToolbar` 的 `position: fixed` |
+| **世界坐标（World）** | 与 `CanvasElement.x/y/width/height` 及 **`WorkflowNode` 的 `x/y`** 一致 | Store、对齐、导出 JSON、浮动条 AABB、**边与端口锚点** |
+| **舞台内容坐标** | `Stage` 子节点在 **应用了 `scaleX/Y=zoom` 与 `x/y=pan`** 之后的坐标系 | Konva 内部节点与 Transformer |
+| **屏幕 / 客户端坐标** | 浏览器视口、`getBoundingClientRect` | 右键菜单、`FloatingToolbar` 的 `position: fixed`、**节点选择器屏幕定位** |
 
 ### 7.2 世界 ← 指针（StageCanvas 中的模式）
 
@@ -239,20 +282,15 @@ y_{\text{world}} = \frac{y_{\text{pointer}} - pan_y}{zoom}
 
 Konva `Group` 默认变换顺序可理解为：**先平移到 `(x,y)`，再绕本地原点旋转**。因此计算元素在父坐标系下的 **轴对齐包围盒（AABB）** 时，应将 **本地四角** `(0,0),(w,0),(w,h),(0,h)` 旋转后再加上 `(x,y)`，而不是绕矩形中心旋转（除非节点建模不同）。浮动条若用错 pivot，旋转后会压在图层上。
 
-```mermaid
-flowchart TB
-  subgraph world["世界坐标"]
-    EL["元素 x,y,w,h,rotation"]
-  end
-  subgraph konva["Konva Stage"]
-    PAN["pan.x, pan.y"]
-    ZOOM["scale = zoom"]
-    G["Group 元素节点"]
-  end
-  EL --> G
-  PAN --> konva
-  ZOOM --> konva
-```
+### 7.4 主舞台 `Layer` 结构（性能）
+
+主 `Stage` 使用 **3 个 `Layer`**（原为 7 层合并而来），以满足 Konva「建议 ≤3～5 层」的提示并减少合成开销：
+
+1. **背景层** `listening={false}`：网格 + 已确定的 **边**（折线/贝塞尔，`listening={false}`）。
+2. **内容层**：根级 `ElementNode` → **`ImageWorkflowPortsOverlay`**（图片端口）→ **`WorkflowNodeView`**（保证端口在 AI 节点 **下方**，避免挡输入口点击）。
+3. **交互与装饰层**：对齐线、框选矩形、`Transformer`、**拖线中的临时虚线**（`Line` 上 `listening={false}`，避免挡下层点击）。
+
+小地图等若另有独立 `Stage`，其层数单独计算。
 
 ---
 
@@ -322,7 +360,14 @@ flowchart LR
 
 ## 10. AI 生图调用流程
 
-### 10.1 模式判定（前端）
+产品上有 **两条并行能力**：
+
+| 入口 | 用途 | 典型 API |
+|------|------|----------|
+| **`AiGenerateModal`** | 选中图层后的 **单步**生图 / 图生图 / inpaint | `POST /api/generate-image` |
+| **画布 `WorkflowNode`** | **多节点图**、端口依赖、可组合多步（每步一次 `run-node` 或前端同步） | `POST /api/workflow/run-node`（见 [§17](#17-画布-ai-节点工作流当前实现)） |
+
+### 10.1 模式判定（`AiGenerateModal`）
 
 | 条件 | `mode`（示意） | 行为 |
 |------|------------------|------|
@@ -330,14 +375,14 @@ flowchart LR
 | 选中图、无蒙版 | `image-to-image` | 仅 `image` |
 | 未选中图或非图 | `generate` | 可无图 |
 
-### 10.2 结果落画布
+### 10.2 结果落画布（单步弹窗）
 
 | 条件 | 结果 |
 |------|------|
 | `outputMode === "replace-selected"` 且选中单图 **且无** 蒙版 | `replaceImageKeepFrame(id, url)`：只换 `src`，外框与蒙版形状等保留策略见 store |
 | 其它 | `layoutNewAiImageBox` 计算新图 `x,y,width,height`（参考图在右侧，`NEW_AI_IMAGE_GAP`），`addElement` 新 `ImageElement` |
 
-### 10.3 端到端时序
+### 10.3 端到端时序（单步）
 
 ```mermaid
 sequenceDiagram
@@ -374,31 +419,40 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   subgraph http["HTTP api/v1"]
-    R["generation.py / upload.py / models.py"]
+    R["generation.py / upload.py / models.py / workflow.py"]
   end
   subgraph svc["services"]
     GS["generation_service.py"]
     US["upload_service.py"]
+    WS["workflow_service.py"]
   end
   subgraph prov["providers"]
     PR["registry + banana/doubao/…"]
+  end
+  subgraph ex["executors"]
+    EX["registry + image_nodes …"]
   end
   subgraph stor["storage"]
     O["oss.py"]
   end
   R --> GS
   R --> US
+  R --> WS
   GS --> US
   GS --> PR
+  WS --> EX
   US --> O
 ```
 
 | 模块 | 职责 |
 |------|------|
-| `api/v1/*.py` | 参数绑定、HTTP 异常、`request_id` |
-| `services/generation_service.py` | 归一化 image/mask URL、选 provider、组装 `GenerateImageResponse`、日志 |
+| `api/v1/workflow.py` | **`POST /workflow/run-node`**：校验体 → `workflow_service.run_node` |
+| `services/workflow_service.py` | 按 **`nodeType`** 从 **`executor_registry`** 取执行器，传入序列化后的 `inputs` / `params` / `traceId` |
+| `executors/*.py` | 节点类型到具体计算/转调（可内部再调 OSS、网关或纯 Python 图像逻辑） |
+| `api/v1/*.py`（其余） | 参数绑定、HTTP 异常、`request_id` |
+| `services/generation_service.py` | 单步生图：归一化 image/mask URL、选 provider、组装响应、日志 |
 | `services/upload_service.py` | dataURL → `storage.ensure_url` |
-| `providers/*.py` | 各厂商：构建 payload、`httpx` 或 Dashscope 调用、解析 `url` |
+| `providers/*.py` | 各厂商单步生图：构建 payload、`httpx` 或 Dashscope、解析 `url` |
 | `utils/http.py` | `post_json_with_retry`（网络/5xx/429 重试） |
 | `storage/oss.py` | 上传字节流 / dataURL |
 | `middleware/request_logging.py` | 请求日志、耗时 |
@@ -441,27 +495,30 @@ flowchart LR
 
 ---
 
-## 13. 保存与加载 JSON
+## 13. 保存与加载 JSON / localStorage
 
-### 13.1 三种「保存」路径
+### 13.1 「保存」路径对照
 
-| 机制 | API | 说明 |
-|------|-----|------|
-| **自动** | `useEditorStore.subscribe` | 每次状态变更写 `localStorage` |
-| **手动导出文件** | `exportProjectJSON` + `downloadJSON`（`export.ts`） | 用户下载 `ProjectJSON` |
-| **手动选文件导入** | `readJSONFile` + `loadProjectJSON` | 校验失败时 UI alert |
-| **远程** | `saveRemote(url)` / `loadRemote(url)` | `fetch` POST 完整 JSON / GET 解析；**需自备**接受/返回 `ProjectJSON` 的服务 |
+| 机制 | API / 位置 | 说明 |
+|------|--------------|------|
+| **自动** | `useEditorStore.subscribe` → **`tryWriteProjectToLocalStorage`** | **防抖**；**配额保护**；见 [§5.3](#53-自动持久化localstorage) |
+| **手动立即写盘** | `saveLocal()` | 直接 `JSON.stringify` + `setItem`，**不**含防抖与瘦身；大项目慎用 |
+| **手动导出文件** | `exportProjectJSON` + `downloadJSON`（`export.ts`） | 用户下载 `ProjectJSON`（**含 `aiNodes`/`edges`**） |
+| **手动选文件导入** | `readJSONFile` + `loadProjectJSON` | `migratePage` 迁移旧页；失败时 UI alert |
+| **远程** | `saveRemote(url)` / `loadRemote(url)` | `fetch` POST/GET；**需自备**接受/返回 `ProjectJSON` 的服务 |
 
-### 13.2 `ProjectJSON` 与 `localStorage` 的差异
+### 13.2 `ProjectJSON` 与 `localStorage` 快照的差异
 
-| 内容 | `ProjectJSON` 文件 | `localStorage` |
-|------|-------------------|----------------|
-| `pages`、`activePageId` | ✓ | ✓ |
-| `zoom`、`pan` | 可选（导出函数未强制；加载时以 store 逻辑为准） | ✓ |
-| `quickToolbarConfig` | 不在 `exportProjectJSON` 默认结构内 | ✓ |
-| `selectedIds` | 导出时当前选择可存在快照逻辑外 | 一般不持久 |
+| 内容 | `ProjectJSON` 文件 | `localStorage` 自动快照 |
+|------|-------------------|------------------------|
+| `pages`（含 `aiNodes`、`edges`） | ✓ | ✓ |
+| `activePageId` | ✓ | ✓ |
+| `zoom`、`pan` | 导出结构以 store 为准 | ✓ |
+| `quickToolbarConfig` | 默认导出体可能不含；以 `exportProjectJSON` 实现为准 | ✓ |
+| `editorMode` | 随 `pages` 持久化需求可选 | ✓ |
+| `selectedIds` / `selectedWorkflowNodeIds` | 一般不依赖 | **不**写入自动快照 |
 
-维护时若希望「工程文件包含视口与快捷条」，需扩展 `ProjectJSON` 与 `loadProjectJSON`。
+若超大 **`data:`** 图导致配额命中，自动快照可能已将长 data URL **替换为占位图**；**以导出文件为准**做完整备份更可靠；生产环境建议 **大图走 OSS URL**，减少 `pages` 体积。
 
 ---
 
@@ -479,7 +536,7 @@ Transformer `transformend` → 将 `scaleX` 等收敛到 `width/height`（代码
 
 多选 → `groupSelected`：计算包围盒，新建 `group` 元素，子元素设 `parentId`。
 
-### 14.4 AI 局部重绘闭环
+### 14.4 AI 局部重绘闭环（单步弹窗）
 
 选中图片 → 打开蒙版编辑 → 笔划 → 保存写入 `aiMask` → 打开生图 Modal → 带 `mask` dataURL 请求 → 后端上传 OSS → 网关 inpaint → 新图层或替换策略。
 
@@ -492,6 +549,23 @@ flowchart TB
   E --> F["addElement / replace"]
 ```
 
+### 14.5 画布工作流（节点 + 连线）
+
+```mermaid
+flowchart TB
+  P[从输出端口拖线] --> Q{落点}
+  Q -->|画布空白/完成| R[openWorkflowNodePicker]
+  Q -->|另一节点输入口| S[completeWorkflowConnectingToInput]
+  R --> T[createWorkflowNodeFromPicker]
+  S --> U[addWorkflowEdge]
+  T --> V[runWorkflowNode]
+  U --> V
+  V --> W{executor}
+  W -->|none + 特殊类型| X[前端逻辑 如 output-view]
+  W -->|后端| Y["POST /api/workflow/run-node"]
+  Y --> Z[updateWorkflowNode outputs]
+```
+
 ---
 
 ## 15. 容易混淆的问题
@@ -502,61 +576,83 @@ flowchart TB
 | **展示蒙版 `maskShape` vs AI 蒙版 `aiMask`** | 前者是 **clip 形状**（圆角矩形/圆）；后者是 **笔刷栅格语义**，用于 inpaint。 |
 | **世界坐标 AABB vs Konva `getClientRect`** | 若自算 AABB，旋转 pivot 必须与 Konva 一致（见第 7 节）。 |
 | **`parentId` 与 `group.children`** | 当前数据模型二者并存；修改组合逻辑时需保持同步，避免孤儿引用。 |
-| **历史栈与 `updateElement`** | 默认每次 `updateElement` 会 `commitHistory`；高频事件（如拖拽每一帧）若在中间态也入栈会导致撤销粒度异常——当前实现依赖 Konva 层是否在 end 才写回（需阅读 `StageCanvas` 具体绑定）。 |
+| **历史栈与 `updateElement`** | 默认每次 `updateElement` 会 `commitHistory`；高频事件若在中间态也入栈会导致撤销粒度异常——**工作流节点拖拽**应避免在 `onDragMove` 写回 `x/y`，在 `dragend` 一次性提交。 |
+| **`localStorage` 与 `QuotaExceededError`** | 自动订阅路径已 **防抖 + try/catch + 长 data URL 瘦身**；`saveLocal` 仍可能因过大而失败，重要工程请用 **导出 JSON** 或远程。 |
+| **旧 `Page.workflow` vs `aiNodes`/`edges`** | 加载时走 `migratePage`；新代码只应维护 **统一图** 模型。 |
 | **跨域图片** | `crossOrigin = anonymous` 仍可能因 CDN 策略无法 `toDataURL`；导出 PNG 会失败，需换同源或代理。 |
 | **`/api` 路径** | 开发环境依赖 Vite 代理；生产部署需 **同源反向代理** 或改 `fetch` 基地址。 |
 | **端口** | `vite.config.ts` 默认 `API_PORT=13555` 与 `package.json` 中 uvicorn 一致；只改一端会 502。 |
+| **控制台里的 `chrome-extension://…`** | 多为浏览器扩展注入脚本失败，**与本仓库无关**；可用无痕/禁用扩展排除。 |
 
 ---
 
-## 16. 如何扩展成 AI 工作流
+## 16. 如何扩展
 
-以下按 **侵入性从低到高** 排列。
-
-### 16.1 仅扩展「一步工具」
+### 16.1 扩展「单步生图」弹窗
 
 | 步骤 | 做法 |
 |------|------|
-| 新增后端能力 | 在 `schemas/generation.py` 等增加可选字段 → 扩展对应 `providers/*.py` 或注册新 provider → 必要时扩展 `generation_service` |
-| 新增前端参数 | `AiGenerateModal` 表单字段并入 `payload`；与后端字段名对齐（camelCase 已在 Pydantic 用 alias 处理处留意） |
+| 新增后端能力 | `schemas/generation.py` 等增加可选字段 → 扩展 `providers/*.py` 或注册新 provider → `generation_service` |
+| 新增前端参数 | `AiGenerateModal` 表单并入 `payload`；与后端字段名对齐 |
 
-### 16.2 扩展「画布上的 AI 节点」
+### 16.2 扩展「画布 AI 节点」
 
 | 步骤 | 做法 |
 |------|------|
-| 新元素类型 | 在 `types.ts` 增加 `ElementType` 与联合成员；`StageCanvas` 增加渲染分支 |
-| 序列化 | `ProjectJSON` 无额外字段，只要 `elements` 数组可解析即可 |
-| Store | 若新类型需要专用 action，在 `store.ts` 增加方法，并考虑 `getBounds` / 对齐逻辑 |
+| 定义 | 在 `src/workflow/nodes/<name>.ts` 导出 **`WorkflowNodeDefinition`**（`type`、`inputs`/`outputs`、`params`、`executor`、`showRunBar?`、`preview?` 等），并在 **`nodeRegistry.ts`** 注册 |
+| 后端执行器 | 在 `backend/app/executors/` 实现并在 **`executor_registry`** 按 **`nodeType`** 注册；与定义里的 **`executor`** 字符串一致 |
+| 序列化 | 若输入来自上游边，检查 **`serializeWorkflowInputsForApi` / `resolveAiNodeInputs`** 是否需要新端口 id 或类型分支 |
+| 纯前端节点 | `executor: "none"`，必要时 `showRunBar: true`；在 **`runWorkflowNode`** 内为特定 `node.type` 写分支（参考 `output-view`） |
 
-### 16.3 多步工作流（DAG / Agent）
+### 16.3 扩展画布元素类型
 
-```mermaid
-flowchart LR
-  subgraph today["当前：单步请求"]
-    T1[用户点生成]
-    T2[一次 HTTP]
-    T3[单张结果入画布]
-    T1 --> T2 --> T3
-  end
-  subgraph future["扩展：工作流引擎"]
-    W1[Workflow 定义 JSON]
-    W2[步骤队列 / 状态机]
-    W3[每步读写 Store 或临时 layer]
-    W4[人审确认节点]
-    W1 --> W2 --> W3 --> W4
-  end
-```
-
-建议实践：
-
-1. **工作流状态与编辑器状态分离**：例如 `workflowStore` 或在元素上挂 `meta.workflowStepId`，避免污染 undo 粒度。
-2. **每步输入输出明确**：上一步导出「图层 ID 列表 + 参数」；下一步从 Store 读取并调用现有 `exportImageMaskToDataURL` / `exportProjectJSON` 子集。
-3. **可观测性**：沿用 `traceId`（前端已 `nanoid()`），贯穿后端日志与 OSS 路径。
-4. **失败重试与部分成功**：`utils/http.py` 已有 HTTP 重试范式，工作流层可包装「步骤级重试 + 用户跳过」。
+在 `types.ts` 增加 `ElementType` 与联合成员；`StageCanvas` / `ElementNode` 增加渲染分支；注意 **`export.ts`** 与组合/对齐逻辑。
 
 ### 16.4 与 Cursor / SDK 自动化结合
 
-若将来用 **Cursor Agent** 或 **`@cursor/sdk`** 驱动本应用：优先通过 **稳定的 JSON 契约**（`ProjectJSON` + 自建「工作流描述」schema）交换，而非模拟 UI 点击；画布侧暴露「导入工程」「选中 id」「替换 src」等 **store 级 API** 最适合自动化。
+优先通过 **`ProjectJSON`** 或 **store 级 API**（`loadProjectJSON`、`setSelectedIds`、`replaceImageKeepFrame`、`runWorkflowNode` 等）交换，而非模拟 UI 点击。
+
+---
+
+## 17. 画布 AI 节点工作流（当前实现）
+
+### 17.1 统一图模型
+
+- 每张 **`Page`** 同时持有 **`elements`**（位图/矢量等）与 **`aiNodes`**（AI 功能块），用 **`edges`** 连接 **图片元素端口** 与 **AI 节点端口**（或 AI→AI）。
+- **旧** `Page.workflow`（仅 AI 子图）由 **`migrateLegacyWorkflowGraph` / `migratePage`** 在加载时迁到 `aiNodes` + `edges`。
+
+### 17.2 前端注册表与创建
+
+- **`WORKFLOW_NODE_REGISTRY`**：`type` → `WorkflowNodeDefinition`。
+- **`createWorkflowNode(type, x, y)`**：生成运行时 `WorkflowNode`（默认尺寸、初始 `params` 等）。
+- **`listCreatableWorkflowNodes(fromDataType)`**：从端口拖线创建时，过滤 **可接收该数据类型** 的节点定义。
+
+### 17.3 运行路径
+
+```mermaid
+sequenceDiagram
+  participant UI as WorkflowNodeView
+  participant Store as useEditorStore
+  participant API as POST /api/workflow/run-node
+  participant EX as executor_registry
+
+  UI->>Store: runWorkflowNode(id)
+  Store->>Store: resolve inputs serializeWorkflowInputsForApi
+  alt output-view 等纯前端
+    Store->>Store: updateWorkflowNode outputs
+  else 后端 executor
+    Store->>API: nodeType inputs params traceId
+    API->>EX: run
+    EX-->>API: outputs dict
+    API-->>Store: JSON outputs
+    Store->>Store: updateWorkflowNode success/error
+  end
+```
+
+### 17.4 与单步生图的关系
+
+- **单步弹窗**走 **`/api/generate-image`** 与 **`providers`** 体系。
+- **工作流节点**走 **`/api/workflow/run-node`** 与 **`executors`** 体系。二者可复用同一 OSS/网关能力，但 **路由与注册表分离**，扩展时勿混用。
 
 ---
 
@@ -564,14 +660,18 @@ flowchart LR
 
 | 主题 | 文件 |
 |------|------|
-| 类型定义 | `src/editor/types.ts` |
+| 类型定义 | `src/editor/types.ts`、`src/workflow/types.ts` |
 | 状态与持久化 | `src/editor/store.ts` |
 | 主画布 | `src/components/StageCanvas.tsx` |
-| AI 请求 | `src/components/AiGenerateModal.tsx` |
+| 工作流节点视图 | `src/components/workflow/WorkflowNodeView.tsx` |
+| 节点注册与定义 | `src/workflow/nodeRegistry.ts`、`src/workflow/nodes/*.ts` |
+| 统一图工具 | `src/workflow/utils/unifiedGraph.ts`、`runPayload.ts`、`createNode.ts` |
+| 单步 AI 请求 | `src/components/AiGenerateModal.tsx` |
 | 蒙版栅格化 | `src/editor/mask.ts` |
 | 裁剪导出 | `src/editor/export.ts` |
 | 后端入口 | `backend/app/main.py`（`uvicorn backend.app.main:app`） |
-| 生图编排 | `backend/app/services/generation_service.py` + `backend/app/providers/` |
+| 单步生图编排 | `backend/app/services/generation_service.py` + `backend/app/providers/` |
+| 工作流节点 API | `backend/app/api/v1/workflow.py` + `services/workflow_service.py` + `executors/` |
 | OSS | `backend/app/storage/oss.py` |
 | 开发代理 | `vite.config.ts` |
 

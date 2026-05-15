@@ -10,6 +10,7 @@ import {
   Transformer,
   Group,
   Line,
+  Circle,
 } from "react-konva";
 import Konva from "konva";
 import type { HitContext, SceneContext } from "konva/lib/Context";
@@ -18,6 +19,14 @@ import { nanoid } from "nanoid";
 import { fallback, getImageDefaults, useEditorStore } from "../editor/store";
 import type { CanvasElement, ImageElement, ImageMaskData, TextElement } from "../editor/types";
 import { exportMaskToDataURL } from "../editor/mask";
+import { PORT_COLORS } from "../workflow/portColors";
+import { imageOutputPortOffset } from "../workflow/nodeLayout";
+import {
+  edgeBezierPointsUnified,
+  tempWireFromEndpoint,
+} from "../workflow/utils/unifiedGraph";
+import { NodePicker } from "./workflow/NodePicker";
+import { WorkflowNodeView } from "./workflow/WorkflowNodeView";
 
 export type GuideLine = {
   type: "vertical" | "horizontal";
@@ -277,7 +286,6 @@ export function StageCanvas(props: StageCanvasProps) {
   const transformerRef = useRef<Konva.Transformer | null>(null);
 
   const {
-    getActivePage,
     selectedIds,
     setSelectedIds,
     zoom,
@@ -285,7 +293,12 @@ export function StageCanvas(props: StageCanvasProps) {
     editingTextId,
   } = useEditorStore();
 
-  const page = getActivePage();
+  const page = useEditorStore((s) =>
+    s.pages.find((p) => p.id === s.activePageId),
+  )!;
+  const workflowConnecting = useEditorStore((s) => s.workflowConnecting);
+  const workflowNodePicker = useEditorStore((s) => s.workflowNodePicker);
+
   const elements = page.elements;
 
   const [guides, setGuides] = useState<GuideLine[]>([]);
@@ -388,7 +401,9 @@ export function StageCanvas(props: StageCanvasProps) {
         e.preventDefault();
         state.removeSelected();
       } else if (e.key === "Escape") {
-        state.setSelectedIds([]);
+        state.cancelWorkflowConnecting();
+        state.closeWorkflowNodePicker();
+        state.clearCanvasSelection();
       }
     }
 
@@ -454,13 +469,11 @@ export function StageCanvas(props: StageCanvasProps) {
     });
 
     if (!e.evt.shiftKey) {
-      setSelectedIds([]);
+      useEditorStore.getState().clearCanvasSelection();
     }
   }
 
   function handleMouseMove() {
-    if (!isSelecting) return;
-
     const stage = stageRef.current;
     if (!stage) return;
 
@@ -469,6 +482,13 @@ export function StageCanvas(props: StageCanvasProps) {
 
     const world = screenToWorld(pointer);
 
+    const st = useEditorStore.getState();
+    if (st.workflowConnecting.active) {
+      st.updateWorkflowConnectingPointer(world.x, world.y);
+    }
+
+    if (!isSelecting) return;
+
     setSelection((prev) => ({
       ...prev,
       x2: world.x,
@@ -476,7 +496,21 @@ export function StageCanvas(props: StageCanvasProps) {
     }));
   }
 
-  function handleMouseUp() {
+  function handleMouseUp(e: Konva.KonvaEventObject<MouseEvent>) {
+    const stage = stageRef.current;
+    const st = useEditorStore.getState();
+    if (st.workflowConnecting.active && stage) {
+      if (e.target === stage) {
+        const pointer = stage.getPointerPosition();
+        if (pointer) {
+          const world = screenToWorld(pointer);
+          st.openWorkflowNodePicker(world.x, world.y);
+        }
+      } else {
+        st.cancelWorkflowConnecting();
+      }
+    }
+
     if (!isSelecting) return;
 
     useEditorStore.getState().setMarqueeSelecting(false);
@@ -510,6 +544,19 @@ export function StageCanvas(props: StageCanvasProps) {
       x2: 0,
       y2: 0,
     });
+  }
+
+  /** 双击空白画布：打开「添加 AI 节点」选择器（与框选起点的命中规则一致：仅 Stage 自身） */
+  function handleStageDblClick(e: Konva.KonvaEventObject<MouseEvent>) {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (e.target !== stage) return;
+
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    const world = screenToWorld(pointer);
+    useEditorStore.getState().openWorkflowNodePickerAtWorld(world.x, world.y);
   }
 
   const selectionBox = {
@@ -617,7 +664,7 @@ export function StageCanvas(props: StageCanvasProps) {
         scaleY={zoom}
         x={pan.x}
         y={pan.y}
-        draggable={!isSelecting}
+        draggable={!isSelecting && !workflowConnecting.active}
         onDragStart={(e) => {
           const st = stageRef.current;
           if (st && e.target === st) {
@@ -640,9 +687,28 @@ export function StageCanvas(props: StageCanvasProps) {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onDblClick={handleStageDblClick}
       >
+        {/* 合并为 3 个 Layer，避免 Konva「>5 layers」性能警告；绘制顺序与原先多 Layer 一致 */}
         <Layer listening={false}>
           <Grid width={5000} height={3000} />
+          {page.edges.map((edge) => {
+            const pts = edgeBezierPointsUnified(page, edge);
+            const dt = edge.dataType;
+            return (
+              <Line
+                key={edge.id}
+                bezier
+                points={pts}
+                stroke={
+                  PORT_COLORS[dt as keyof typeof PORT_COLORS] ?? "#94a3b8"
+                }
+                strokeWidth={2 / zoom}
+                lineCap="round"
+                listening={false}
+              />
+            );
+          })}
         </Layer>
 
         <Layer>
@@ -656,7 +722,19 @@ export function StageCanvas(props: StageCanvasProps) {
                 onOpenCropEditor={props.onOpenCropEditor}
               />
             ))}
+          {/* 图片端口在 AI 节点之下，避免挡住已有节点的输入口点击 */}
+          <ImageWorkflowPortsOverlay
+            images={elements.filter(
+              (e): e is ImageElement =>
+                e.type === "image" && e.visible && !e.parentId,
+            )}
+          />
+          {page.aiNodes.map((node) => (
+            <WorkflowNodeView key={node.id} node={node} zoom={zoom} />
+          ))}
+        </Layer>
 
+        <Layer>
           {guides.map((guide, index) => (
             <Line
               key={`${guide.type}-${guide.position}-${index}`}
@@ -721,8 +799,48 @@ export function StageCanvas(props: StageCanvasProps) {
               return newBox;
             }}
           />
+
+          {workflowConnecting.active &&
+            workflowConnecting.from &&
+            (() => {
+              const pts = tempWireFromEndpoint(
+                page,
+                workflowConnecting.from,
+                workflowConnecting.pointerX,
+                workflowConnecting.pointerY,
+              );
+              return (
+                <Line
+                  bezier
+                  points={pts}
+                  stroke="#42c4c4"
+                  strokeWidth={2 / zoom}
+                  dash={[8 / zoom, 6 / zoom]}
+                  lineCap="round"
+                  listening={false}
+                />
+              );
+            })()}
         </Layer>
       </Stage>
+      {workflowNodePicker.open &&
+        stageRef.current &&
+        (() => {
+          const st = stageRef.current!;
+          const r = st.container().getBoundingClientRect();
+          const wx = workflowNodePicker.x;
+          const wy = workflowNodePicker.y;
+          return (
+            <NodePicker
+              screenX={r.left + pan.x + wx * zoom}
+              screenY={r.top + pan.y + wy * zoom}
+              onClose={() => {
+                useEditorStore.getState().closeWorkflowNodePicker();
+                useEditorStore.getState().cancelWorkflowConnecting();
+              }}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -845,6 +963,7 @@ function commonProps(element: CanvasElement, setGuides: (g: GuideLine[]) => void
         pg.elements.filter((el) => !state.selectedIds.includes(el.id)),
       );
 
+      e.target.position({ x: snap.x, y: snap.y });
       setGuides(snap.guides);
     },
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -1387,6 +1506,65 @@ function AIMaskOverlay(props: {
   );
 }
 
+/** 图片右侧 image/mask 输出端口（世界坐标，叠在 Transformer 之上） */
+function ImageWorkflowPortsOverlay(props: { images: ImageElement[] }) {
+  const startWfConn = useEditorStore((s) => s.startWorkflowConnecting);
+
+  return (
+    <>
+      {props.images.map((element) => (
+        <Group
+          key={`img-wf-port-${element.id}`}
+          x={element.x}
+          y={element.y}
+          rotation={element.rotation}
+        >
+          {(["image", "mask"] as const).map((pid) => {
+            const o = imageOutputPortOffset(pid, element.width, element.height);
+            const disabled = pid === "mask" && !element.aiMask;
+            const col =
+              pid === "image"
+                ? PORT_COLORS.image
+                : disabled
+                  ? "#cbd5e1"
+                  : PORT_COLORS.mask;
+            return (
+              <Circle
+                key={pid}
+                x={o.x}
+                y={o.y}
+                radius={disabled ? 5 : 8}
+                fill={col}
+                stroke="#fff"
+                strokeWidth={2}
+                opacity={disabled ? 0.45 : 1}
+                listening={!element.locked && !disabled}
+                onMouseDown={(e) => {
+                  if (disabled || element.locked) return;
+                  e.cancelBubble = true;
+                  const stage = e.target.getStage();
+                  if (!stage) return;
+                  const pos = stage.getRelativePointerPosition();
+                  if (!pos) return;
+                  startWfConn(
+                    {
+                      kind: "image-element",
+                      elementId: element.id,
+                      portId: pid,
+                    },
+                    pos.x,
+                    pos.y,
+                  );
+                }}
+              />
+            );
+          })}
+        </Group>
+      ))}
+    </>
+  );
+}
+
 function ImageNode(props: {
   element: ImageElement;
   setGuides: (g: GuideLine[]) => void;
@@ -1450,7 +1628,6 @@ function ImageNode(props: {
     <Group
       {...commonProps(element, props.setGuides)}
       draggable={!element.locked}
-      clipFunc={clipShape}
       onClick={(e) => {
         e.cancelBubble = true;
 
@@ -1470,33 +1647,77 @@ function ImageNode(props: {
         props.onOpenCropEditor?.(element.id);
       }}
     >
-      <Rect
-        x={0}
-        y={0}
-        width={element.width}
-        height={element.height}
-        fill="#e5e7eb"
-        cornerRadius={
-          element.maskShape === "roundRect" ? element.cornerRadius || 0 : 0
-        }
-        listening={false}
-      />
-
-      {image && (
-        <FilteredImage
-          image={image}
-          element={element}
-          finalScale={finalScale}
+      <Group clipFunc={clipShape} listening={false}>
+        <Rect
+          x={0}
+          y={0}
+          width={element.width}
+          height={element.height}
+          fill="#e5e7eb"
+          cornerRadius={
+            element.maskShape === "roundRect" ? element.cornerRadius || 0 : 0
+          }
+          listening={false}
         />
-      )}
 
-      {element.aiMask && element.aiMask.strokes.length > 0 && (
-        <AIMaskOverlay
-          mask={element.aiMask}
-          frameW={element.width}
-          frameH={element.height}
+        {image && (
+          <FilteredImage
+            image={image}
+            element={element}
+            finalScale={finalScale}
+          />
+        )}
+
+        {element.aiMask && element.aiMask.strokes.length > 0 && (
+          <AIMaskOverlay
+            mask={element.aiMask}
+            frameW={element.width}
+            frameH={element.height}
+          />
+        )}
+
+        <Rect
+          x={0}
+          y={0}
+          width={element.width}
+          height={element.height}
+          fill="transparent"
+          listening={false}
         />
-      )}
+
+        {element.aiMask && (
+          <Group x={8} y={8} listening={false}>
+            <Rect
+              width={78}
+              height={24}
+              fill="rgba(255,23,23,0.88)"
+              cornerRadius={6}
+            />
+            <Text
+              x={8}
+              y={5}
+              text="AI 蒙版"
+              fontSize={12}
+              fill="#ffffff"
+            />
+          </Group>
+        )}
+
+        {selected && (
+          <Rect
+            x={0}
+            y={0}
+            width={element.width}
+            height={element.height}
+            stroke="#42c4c4"
+            strokeWidth={1}
+            cornerRadius={
+              element.maskShape === "roundRect" ? element.cornerRadius || 0 : 0
+            }
+            listening={false}
+          />
+        )}
+      </Group>
 
       <Rect
         x={0}
@@ -1506,39 +1727,6 @@ function ImageNode(props: {
         fill="transparent"
         listening
       />
-
-      {element.aiMask && (
-        <Group x={8} y={8} listening={false}>
-          <Rect
-            width={78}
-            height={24}
-            fill="rgba(255,23,23,0.88)"
-            cornerRadius={6}
-          />
-          <Text
-            x={8}
-            y={5}
-            text="AI 蒙版"
-            fontSize={12}
-            fill="#ffffff"
-          />
-        </Group>
-      )}
-
-      {selected && (
-        <Rect
-          x={0}
-          y={0}
-          width={element.width}
-          height={element.height}
-          stroke="#42c4c4"
-          strokeWidth={1}
-          cornerRadius={
-            element.maskShape === "roundRect" ? element.cornerRadius || 0 : 0
-          }
-          listening={false}
-        />
-      )}
     </Group>
   );
 }

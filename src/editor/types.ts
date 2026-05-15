@@ -64,6 +64,13 @@ export type ImageElement = BaseElement & {
 
   /** AI 图像编辑蒙版 */
   aiMask?: ImageMaskData | null;
+
+  /** 节点化元信息（图片即 ImageNode；默认可不填，由 UI 统一展示端口） */
+  nodeMeta?: {
+    enabled: true;
+    nodeType: "image";
+    outputs: Array<"image" | "mask">;
+  };
 };
 
 export type RectElement = BaseElement & {
@@ -102,10 +109,25 @@ export type CanvasElement =
   | ArrowElement
   | GroupElement;
 
+import type {
+  EditorMode,
+  NodeEdge,
+  WorkflowConnectingState,
+  WorkflowGraph,
+  WorkflowNode,
+  WorkflowNodePickerState,
+} from "../workflow/types";
+
 export type Page = {
   id: string;
   name: string;
   elements: CanvasElement[];
+  /** 画布上的 AI 功能节点 */
+  aiNodes: WorkflowNode[];
+  /** 图片元素端口 ↔ AI 节点端口 连线 */
+  edges: NodeEdge[];
+  /** @deprecated 由 migratePage 迁移到 aiNodes/edges */
+  workflow?: WorkflowGraph;
 };
 
 export type ToolType = "select" | "rect" | "text" | "image" | "arrow" | "hand";
@@ -130,6 +152,18 @@ export type EditorState = {
 
   /** 各类型元素浮动快捷条按钮（持久化到 localStorage） */
   quickToolbarConfig: Record<QuickToolbarScopeKey, QuickToolId[]>;
+
+  /** 保留字段；统一画布后恒为 canvas */
+  editorMode: EditorMode;
+
+  /** AI 功能节点多选 id */
+  selectedWorkflowNodeIds: string[];
+
+  /** 从端口拖线中的临时状态 */
+  workflowConnecting: WorkflowConnectingState;
+
+  /** 创建节点选择器 */
+  workflowNodePicker: WorkflowNodePickerState;
 };
 
 export type ProjectJSON = {

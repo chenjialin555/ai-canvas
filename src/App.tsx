@@ -344,14 +344,30 @@ export default function App() {
               setAiOpen(true);
             }}
             onConnect={() => {
-              if (toolbarToastTimerRef.current) {
-                window.clearTimeout(toolbarToastTimerRef.current);
+              if (selected?.type === "image") {
+                store.openWorkflowNodePickerAtWorld(
+                  selected.x + selected.width + 80,
+                  selected.y + 40,
+                );
+                if (toolbarToastTimerRef.current) {
+                  window.clearTimeout(toolbarToastTimerRef.current);
+                }
+                setToolbarToast("选择要添加的 AI 节点（图片已带输出端口，也可从右侧圆点拖线）");
+                toolbarToastTimerRef.current = window.setTimeout(() => {
+                  setToolbarToast(null);
+                  toolbarToastTimerRef.current = null;
+                }, 2600);
+              } else {
+                store.openWorkflowNodePickerAtWorld(420, 280);
+                if (toolbarToastTimerRef.current) {
+                  window.clearTimeout(toolbarToastTimerRef.current);
+                }
+                setToolbarToast("在画布上选择图片，或从图片右侧端口拖线连接 AI 节点");
+                toolbarToastTimerRef.current = window.setTimeout(() => {
+                  setToolbarToast(null);
+                  toolbarToastTimerRef.current = null;
+                }, 2800);
               }
-              setToolbarToast("连线功能开发中…");
-              toolbarToastTimerRef.current = window.setTimeout(() => {
-                setToolbarToast(null);
-                toolbarToastTimerRef.current = null;
-              }, 2400);
             }}
             onReplaceImage={(imageId) => {
               setReplaceImageTargetId(imageId);
