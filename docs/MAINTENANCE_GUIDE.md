@@ -17,6 +17,8 @@
 
 ## 2. 如何启动项目？
 
+> **Web / 桌面安装版 / 各启动脚本对照**：见 [`docs/guides/desktop-and-web-startup.md`](./guides/desktop-and-web-startup.md)。
+
 **推荐（脚本会检查依赖）**
 
 ```bash
