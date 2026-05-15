@@ -2,6 +2,7 @@ import { produce } from "immer";
 import type { ProjectJSON } from "../../types";
 import type { Store } from "../types";
 import type { StoreGet, StoreSet } from "../sliceTypes";
+import { resolveApiFetchUrl } from "../../../ai/api/client";
 import { logApiEvent } from "../../../lib/apiDebug";
 import { STORAGE_KEY } from "../constants";
 import { clone } from "../helpers/clone";
@@ -53,14 +54,15 @@ export function createProjectSlice(set: StoreSet, get: StoreGet) {
     },
 
     saveRemote: async (url: string) => {
+      const targetUrl = resolveApiFetchUrl(url);
       const json = get().exportProjectJSON();
       const body = JSON.stringify(json);
-      logApiEvent("request", `POST ${url}`, {
+      logApiEvent("request", `POST ${targetUrl}`, {
         bodyBytes: body.length,
         pages: json.pages?.length,
       });
       try {
-        const res = await fetch(url, {
+        const res = await fetch(targetUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -68,13 +70,13 @@ export function createProjectSlice(set: StoreSet, get: StoreGet) {
           body,
         });
         const text = await res.text();
-        logApiEvent("response", `POST ${url} HTTP ${res.status}`, {
+        logApiEvent("response", `POST ${targetUrl} HTTP ${res.status}`, {
           ok: res.ok,
           bodyHead: text.slice(0, 500),
           bodyLength: text.length,
         });
       } catch (e) {
-        logApiEvent("error", `POST ${url}`, {
+        logApiEvent("error", `POST ${targetUrl}`, {
           message: e instanceof Error ? e.message : String(e),
         });
         throw e;
@@ -82,18 +84,19 @@ export function createProjectSlice(set: StoreSet, get: StoreGet) {
     },
 
     loadRemote: async (url: string) => {
-      logApiEvent("request", `GET ${url}`, {});
+      const targetUrl = resolveApiFetchUrl(url);
+      logApiEvent("request", `GET ${targetUrl}`, {});
       try {
-        const res = await fetch(url);
+        const res = await fetch(targetUrl);
         const text = await res.text();
-        logApiEvent("response", `GET ${url} HTTP ${res.status}`, {
+        logApiEvent("response", `GET ${targetUrl} HTTP ${res.status}`, {
           ok: res.ok,
           bodyLength: text.length,
         });
         const parsed = JSON.parse(text) as ProjectJSON;
         get().loadProjectJSON(parsed);
       } catch (e) {
-        logApiEvent("error", `GET ${url}`, {
+        logApiEvent("error", `GET ${targetUrl}`, {
           message: e instanceof Error ? e.message : String(e),
         });
         throw e;

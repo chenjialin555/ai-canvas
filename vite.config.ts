@@ -9,8 +9,11 @@ export default defineConfig(({ mode }) => {
   const apiPort = env.API_PORT || DEFAULT_API_PORT;
   /** start-dev.sh 会设 DEV_NO_RELOAD=1：不监听文件、不 HMR，改代码需重启进程 */
   const noReload = process.env.DEV_NO_RELOAD === "1";
+  /** Electron 打包用 file:// 打开 dist/index.html，资源须用相对路径 */
+  const electronBuild = process.env.ELECTRON_BUILD === "1";
 
   return {
+    base: electronBuild ? "./" : "/",
     plugins: [react()],
     server: {
       host: "0.0.0.0",

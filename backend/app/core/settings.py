@@ -21,6 +21,8 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            # Electron 安装包从 file:// 加载时，跨域请求 Origin 常为字符串 "null"
+            "null",
         ],
     )
 

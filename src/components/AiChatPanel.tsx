@@ -14,6 +14,7 @@ import {
   PROVIDERS,
   type ImageProvider,
 } from "../ai/generation/generationTypes";
+import { apiUrl } from "../ai/api/client";
 import { postGenerateImage } from "../ai/api/generationApi";
 
 type ChatMsg =
@@ -122,7 +123,7 @@ export function AiChatPanel(props: Props) {
     setLoading(true);
 
     logApiEvent("request", "POST /api/generate-image (AI 对话)", {
-      url: `${window.location.origin}/api/generate-image`,
+      url: apiUrl("/api/generate-image"),
       traceId,
       headers: { "Content-Type": "application/json", "X-Request-ID": traceId },
       bodySummary: summarizePayloadForLog(payload as Record<string, unknown>),

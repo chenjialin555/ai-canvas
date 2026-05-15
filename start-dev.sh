@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # 同时启动：前端 Vite（默认 5173）+ 后端 FastAPI（端口见 .env 的 API_PORT，默认 13555）
+# 仅 Web：在浏览器打开 http://127.0.0.1:5173 使用；不包含 Electron 桌面版。
+# 已安装桌面客户端只起后端：./start-backend.sh
+# 网页开发（热更新）：./start-web.sh 或 npm run dev
+# 源码里跑 Electron 开发：./start-dev-desktop.sh
 # 本脚本为「无热更新」模式：改代码后需 Ctrl+C 停掉再重新运行本脚本；浏览器也需刷新。
 # 若需要保存即热更新，请用：npm run dev
 # 依赖：已安装 Node/npm、uv，并已 npm install、uv sync

@@ -8,6 +8,7 @@ import {
   summarizeResponseBodyForLog,
 } from "../../lib/apiDebug";
 import { formatApiDetail } from "../../lib/apiFormat";
+import { apiUrl } from "../api/client";
 import { postGenerateImage } from "../api/generationApi";
 import {
   buildModalGenerateImagePayload,
@@ -47,7 +48,7 @@ export async function generateImageFromModal(
   );
 
   logApiEvent("request", "POST /api/generate-image", {
-    url: `${window.location.origin}/api/generate-image`,
+    url: apiUrl("/api/generate-image"),
     traceId,
     headers: { "Content-Type": "application/json", "X-Request-ID": traceId },
     bodySummary: summarizePayloadForLog(payload as Record<string, unknown>),
@@ -64,7 +65,7 @@ export async function generateImageFromModal(
       });
       return {
         ok: false,
-        message: `无法连接后端：${apiResult.message}。请确认已运行 uvicorn，且 .env 中 API_PORT 与 vite.config 代理一致（默认 13555）。`,
+        message: `无法连接后端：${apiResult.message}。请确认后端已运行；Web 开发依赖 Vite 代理或设置 VITE_API_BASE_URL；桌面版默认 http://127.0.0.1:13555（与 .env 中 API_PORT 一致）。`,
       };
     }
 

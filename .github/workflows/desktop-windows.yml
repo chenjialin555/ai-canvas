@@ -1,0 +1,30 @@
+# 在 GitHub 云端 Windows 环境打 NSIS 安装包（.exe），无需本机安装 Windows。
+# 使用：GitHub 仓库 → Actions → 「Desktop Windows (NSIS exe)」→ Run workflow
+name: Desktop Windows (NSIS exe)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install & build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm ci
+          npm run build:desktop:win
+
+      - name: Upload installer (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-canvas-windows-setup
+          path: release/*.exe
