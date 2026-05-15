@@ -1,5 +1,5 @@
 /**
- * AI 节点布局规范（世界坐标，与 WorkflowNodeView、unifiedGraph、WorkflowCanvas 必须一致）
+ * AI 节点布局规范（世界坐标，与 WorkflowNodeView、unifiedGraph 必须一致）
  */
 export const AI_NODE_MIN_WIDTH = 280;
 export const AI_NODE_MIN_HEIGHT = 220;

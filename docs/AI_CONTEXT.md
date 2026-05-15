@@ -78,6 +78,8 @@ src/
 
 **后端**：`backend/app/`（`api/v1`、`services`、`providers`、`executors`、`schemas`、`storage`、`core`）。
 
+**归档（不参与构建）**：`src/_archive/` — 重构后无引用的占位/旧实现，见 `src/_archive/README.md`；`tsconfig.app.json` 已 `exclude`。
+
 ---
 
 ## 4. 当前架构分层（理解用）

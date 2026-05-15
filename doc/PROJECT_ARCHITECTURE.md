@@ -94,13 +94,32 @@ flowchart LR
 
 ## 3. 仓库目录结构（导读）
 
-仓库按 **前端 `src/`**、**后端 `backend/app/`**、**文档 `doc/`**、**启动脚本** 组织。以下为 **导读**；**每一个源码文件的相对路径、行数（`wc -l`）、职责** 见：
+仓库按 **前端 `src/`**、**后端 `backend/app/`**、**文档 `doc/` + `docs/`**、**启动脚本** 组织。以下为 **导读**；**每一个源码文件的相对路径、行数（`wc -l`）、职责** 见：
 
-- [§18 前端源码文件全表](#18-前端源码文件全表)（全部 `src/**/*.ts`、`src/**/*.tsx`）
+- [§18 前端源码文件全表](#18-前端源码文件全表)（参与构建的 `src/**/*.ts(x)`，**不含** `src/_archive/`）
+- [§18.10 归档代码](#1810-src_archive不参与构建)（重构后无引用的旧模块）
 - [§19 后端 Python 源码文件全表](#19-后端-python-源码文件全表)（`backend/**/*.py`）
 - [§20 根目录脚本与配置](#20-根目录脚本与配置)（`vite.config.ts`、`start-dev.sh`、`index.html`、本文档）
 
-**体量提示**：主画布 `StageCanvas.tsx`、应用编排 `src/app/App.tsx`（侧栏等已拆出）、Zustand 工作流切片 `workflowSlice.ts`、`unifiedGraph.ts` 为当前行数较多的单文件，修改前建议用 IDE 大纲或本文档定位子职责。
+**短文档（给 AI / 日常维护）**：[`docs/AI_CONTEXT.md`](../docs/AI_CONTEXT.md)、[`docs/MAINTENANCE_GUIDE.md`](../docs/MAINTENANCE_GUIDE.md)、[`docs/ROADMAP.md`](../docs/ROADMAP.md)。
+
+### 3.1 前端 `src/` 树（当前真实布局）
+
+```text
+src/
+├── main.tsx                 → ./app/App
+├── app/                     # 应用壳（顶栏、侧栏、CanvasArea、EditorModals）
+├── components/              # StageCanvas、FloatingToolbar、workflow/WorkflowNodeView 等
+├── canvas/                  # layers、elements、interaction、hooks、utils/coordinates
+├── image-tools/             # crop/、mask/（裁剪与 AI 蒙版编辑器）
+├── ai/                      # api/、generation/、workflow/（单步生图与工作流 HTTP）
+├── editor/                  # types、export、store/、commands/
+├── workflow/                # nodeRegistry、nodes/、utils/unifiedGraph
+├── lib/
+└── _archive/                # 不参与 tsc/Vite（见 §18.10）
+```
+
+**体量提示**：`WorkflowNodeView.tsx`、`workflowSlice.ts`、`StageCanvas.tsx`、`RightSidebar.tsx`、`unifiedGraph.ts` 为当前行数较多的单文件；应用编排已收敛到 `src/app/App.tsx`（约 250 行），不再使用根目录 `src/App.tsx`。
 
 ---
 
@@ -198,6 +217,8 @@ stateDiagram-v2
 
 **要点**：`renamePage`、部分 UI 标志位可能 **不** 入历史；工作流节点在 **`runWorkflowNode` 成功/失败收尾** 或 **`output-view` 同步完成** 时会 `commitHistory`，而运行中的 `running` 更新通常 `history: false`。
 
+**手势合并（阶段 9）**：拖拽、多选 **Transformer** 缩放/旋转在 **`editor/commands/interactionGestureHistory.ts`** 内用引用计数，只在手势 **开始/结束** 各 `commitHistory` 一次，避免 `onDragMove` / `transform` 中间态重复入栈。画布元素侧入口见 `canvas/elements/commonProps.ts`、`GroupElementNode.tsx`。
+
 ### 5.3 自动持久化（`localStorage`）
 
 - **键名**：`STORAGE_KEY` = `AI_CANVAS_PRO_PROJECT_V2`（`src/editor/store/constants.ts`）。
@@ -235,7 +256,7 @@ stateDiagram-v2
 | `src/editor/store/slices/uiSlice.ts` | 33 | 快捷条配置、框选/浮动条抑制、`setEditorMode` |
 | `src/editor/store/slices/pageSlice.ts` | 128 | 页面增删改复制、切换活动页 |
 | `src/editor/store/slices/projectSlice.ts` | 103 | 导入导出 JSON、`saveLocal`、远程 save/load |
-| `src/editor/store/slices/workflowSlice.ts` | 433 | 工作流节点/边/连线 UI/选择器、`runWorkflowNode`、结果落画布 |
+| `src/editor/store/slices/workflowSlice.ts` | 406 | 工作流节点/边/连线 UI/选择器、`runWorkflowNode`、结果落画布 |
 
 ---
 
@@ -245,22 +266,23 @@ stateDiagram-v2
 
 | 组件 / 文件 | 行数 | 与 Store 的关系 | 主要职责 |
 |-------------|------|-----------------|----------|
-| `src/app/App.tsx` | 217 | `useEditorStore()`、`useAppModals` 等 | **应用编排**：`AppShell` 槽位、右键菜单、画布区回调、与各子模块衔接 |
+| `src/app/App.tsx` | 251 | `useEditorStore()`、`useAppModals` 等 | **应用编排**：`AppShell` 槽位、右键菜单、画布区回调、`EditorModals` |
 | `src/app/RightSidebar.tsx` | 491 | `useEditorStore()` | 右侧属性 / AI 生成（`AiChatPanel`）/ 占位对话 |
 | `src/app/TopBar.tsx` | 180 | `useEditorStore()` | 顶栏：工具切换、加元素、素材库/AI/设置入口、撤销重做、JSON 与 Stage 导出 |
-| `StageCanvas.tsx` | 423 | `zoom`/`pan`/页面/连线等 | **主画布**：3 层 `Layer`、元素与边、图片端口 overlay、工作流节点、框选、Transformer、临时连线 |
-| `workflow/WorkflowNodeView.tsx` | 706 | 读 `node`、写 store | 单节点 Konva：端口、预览、运行、拖拽（不在 `onDragMove` 写回 `x/y`） |
-| `workflow/NodePicker.tsx` | 133 | `workflowNodePicker`、创建节点 | 从端口拖线后选择节点类型的浮层 UI |
-| `workflow/WorkflowCanvas.tsx` | 247 | 主要为旧/备用工作流画布（若仍挂载） | 独立工作流画布实验代码；与统一画布并存时注意入口 |
+| `src/components/StageCanvas.tsx` | 423 | `zoom`/`pan`/页面/连线等 | **主画布入口**：组合 `canvas/layers/*`、hooks、拖放图片；Konva 交互核心仍在此文件 |
+| `src/components/workflow/WorkflowNodeView.tsx` | 714 | 读 `node`、写 store | 单节点 Konva：端口、预览、运行、拖拽（`dragend` 写回位置） |
+| `src/components/workflow/NodePicker.tsx` | 133 | `workflowNodePicker`、创建节点 | 从端口拖线后选择节点类型的浮层 UI |
 | `src/image-tools/crop/CropEditorModal.tsx` | 678 | `updateElement`、`clone` | 裁剪 Konva 场景，`cropOffset*` / `cropScale` / `cropRotation` / flip |
 | `src/image-tools/mask/MaskEditorModal.tsx` | 604 | `setImageAIMask` | AI 蒙版笔刷，`aiMask.strokes` |
-| `ai/generation/AiGenerateModal.tsx` | — | 表单 UI；`generationService` 负责请求与落版 | **单步** `POST /api/generate-image` |
-| `AiChatPanel.tsx` | 432 | `getImageDefaults`、`useEditorStore` | 侧栏对话与附件，与画布松耦合 |
-| `FloatingToolbar.tsx` | 313 | 选区、`marqueeSelecting`、`floatingToolbarSuppressed` | Portal 快捷条，世界 AABB → 屏幕坐标 |
-| `QuickToolbarSettings.tsx` | 130 | `setQuickToolbarConfig` | 快捷条按钮白名单配置 UI |
-| `LibraryPanel.tsx` | 123 | `addElement` 等 | 素材库入口 |
-| `ContextMenu.tsx` | 117 | 右键回调 | 画布右键菜单 |
-| `MiniMap.tsx` | 96 | 读 `pages`、视口 | 小地图导航 |
+| `src/ai/generation/AiGenerateModal.tsx` | 305 | 表单 UI | **单步**生图弹窗；请求与落版见 `generationService.ts` |
+| `src/components/AiChatPanel.tsx` | 440 | `getImageDefaults`、`useEditorStore` | 侧栏对话与附件，与画布松耦合 |
+| `src/components/FloatingToolbar.tsx` | 313 | 选区、`marqueeSelecting`、`floatingToolbarSuppressed` | Portal 快捷条，世界 AABB → 屏幕坐标 |
+| `src/components/QuickToolbarSettings.tsx` | 130 | `setQuickToolbarConfig` | 快捷条按钮白名单配置 UI |
+| `src/components/LibraryPanel.tsx` | 123 | `addElement` 等 | 素材库入口 |
+| `src/components/ContextMenu.tsx` | 117 | 右键回调 | 画布右键菜单 |
+| `src/components/MiniMap.tsx` | 96 | 读 `pages`、视口 | 小地图导航 |
+
+> **已归档**：独立 `WorkflowCanvas`、未接入的 `executeCommand` 等见 [`src/_archive/README.md`](../src/_archive/README.md)，**不参与构建**。
 
 **原则**：**可序列化状态尽量只在 Zustand**；Modal 内临时 UI 状态用 `useState`，确认时再调用 store。
 
@@ -347,7 +369,7 @@ sequenceDiagram
 
 `MaskEditorModal` 在保存时组装 `ImageMaskData` → `setImageAIMask`。
 
-`AiGenerateModal` 在请求前调用 `exportImageMaskToDataURL`（`mask.ts`）：离屏 `canvas` 上按 stroke 重放路径，**橡皮**用 `globalCompositeOperation = 'destination-out'`。
+`AiGenerateModal` / `generationService` 在请求前调用 `exportImageMaskToDataURL`（`src/image-tools/mask/maskRasterize.ts`）：离屏 `canvas` 上按 stroke 重放路径，**橡皮**用 `globalCompositeOperation = 'destination-out'`。
 
 前端将 `mask` 以 **dataURL** 放入 JSON；后端 `normalize_request_images` 内 **`ensure_url` → OSS**，网关侧始终收到 **http(s) URL**。
 
@@ -389,7 +411,7 @@ flowchart LR
 | 条件 | 结果 |
 |------|------|
 | `outputMode === "replace-selected"` 且选中单图 **且无** 蒙版 | `replaceImageKeepFrame(id, url)`：只换 `src`，外框与蒙版形状等保留策略见 store |
-| 其它 | `layoutNewAiImageBox` 计算新图 `x,y,width,height`（参考图在右侧，`NEW_AI_IMAGE_GAP`），`addElement` 新 `ImageElement` |
+| 其它 | `generationService` 内 `layoutNewAiImageBox`（`ai/generation/generationLayout.ts` → `lib/aiImageLayout.ts`）计算新图外框，`addElement` 新 `ImageElement` |
 
 ### 10.3 端到端时序（单步）
 
@@ -412,7 +434,7 @@ sequenceDiagram
   M-->>Gen: 结果 URL 或 base64
   Gen-->>API: url + uploaded 元数据
   API-->>UI: JSON url
-  UI->>UI: loadImageNaturalSize + layout + addElement
+  UI->>UI: generationService → loadImageNaturalSize + layout + addElement
 ```
 
 ### 10.4 与后端模型表对齐
@@ -670,9 +692,7 @@ sequenceDiagram
 ### 17.4 与单步生图的关系
 
 - **单步弹窗**走 **`/api/generate-image`** 与 **`providers`** 体系。
-- **工作流节点**走 **`/api/workflow/run-node`** 与 **`executors`** 体系。二者可复用同一 OSS/网关能力，但 **路由与注册表分离**，扩展时勿混用。
-
----
+- **工作流节点**走 **`/api/workflow/run-node`** 与 **`executors`** 体系；前端 HTTP 封装在 **`src/ai/workflow/api/workflowApi.ts`**，编排见 **`workflowRunner.ts`**。二者可复用同一 OSS/网关能力，但 **路由与注册表分离**，扩展时勿混用。
 
 ---
 
@@ -683,13 +703,17 @@ sequenceDiagram
 | 编辑器类型 | `src/editor/types.ts` |
 | 工作流类型 | `src/workflow/types.ts` |
 | 状态入口 | `src/editor/store.ts`（re-export）→ `src/editor/store/index.ts` |
-| 主画布 | `src/components/StageCanvas.tsx` |
+| 主画布 | `src/components/StageCanvas.tsx` + `src/canvas/*` |
+| 坐标换算 | `src/canvas/utils/coordinates.ts` |
+| 手势历史 | `src/editor/commands/interactionGestureHistory.ts` |
 | 工作流节点视图 | `src/components/workflow/WorkflowNodeView.tsx` |
-| 节点注册与定义 | `src/workflow/nodeRegistry.ts`、`src/workflow/nodes/*.ts` |
+| 节点注册与定义 | `src/workflow/nodeRegistry.ts`、`src/workflow/nodes/*.ts`（**不含** `_archive` 内旧 input 节点） |
 | 统一图工具 | `src/workflow/utils/unifiedGraph.ts`、`runPayload.ts`、`createNode.ts` |
-| 单步 AI 请求 | `src/ai/generation/AiGenerateModal.tsx` + `generationService.ts` |
+| 单步 AI | `src/ai/generation/*`、`src/ai/api/generationApi.ts` |
+| 工作流运行（前端） | `src/ai/workflow/services/workflowRunner.ts`、`workflowApi.ts` |
 | 蒙版栅格化 | `src/image-tools/mask/maskRasterize.ts` |
 | 裁剪导出 | `src/editor/export.ts` |
+| 归档（不参与构建） | `src/_archive/README.md` |
 | 后端入口 | `backend/app/main.py` |
 | 单步生图编排 | `backend/app/services/generation_service.py`、`backend/app/providers/` |
 | 工作流节点 API | `backend/app/api/v1/workflow.py`、`services/workflow_service.py`、`executors/` |
@@ -700,7 +724,7 @@ sequenceDiagram
 
 ## 18. 前端源码文件全表
 
-以下列出仓库内 **全部** `src/**/*.ts` 与 `src/**/*.tsx`（不含 `node_modules`）。**行数** 为 `wc -l` 的物理行数，统计时 **前端 TypeScript 合计约 10616 行**（含空行）；单文件以表中为准。
+以下列出 **参与构建** 的 `src/**/*.ts` 与 `src/**/*.tsx`（**不含** `src/_archive/`，该目录已在 `tsconfig.app.json` 中 `exclude`）。**行数** 为 `wc -l` 物理行数；**合计约 11263 行**（2026-05-15 统计）。归档文件见 [§18.10](#1810-src_archive不参与构建)。
 
 ### 18.1 `src/` 根与入口
 
@@ -713,8 +737,7 @@ sequenceDiagram
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `src/components/AiChatPanel.tsx` | 432 | 侧栏 AI 对话、附件与简单生图辅助 |
-| `src/ai/generation/AiGenerateModal.tsx` | — | 单步生图 Modal UI；业务见 `generationService.ts` |
+| `src/components/AiChatPanel.tsx` | 440 | 侧栏 AI 对话、附件与简单生图辅助 |
 | `src/components/ContextMenu.tsx` | 117 | 画布右键菜单 |
 | `src/components/FloatingToolbar.tsx` | 313 | 选中元素上方 HTML 快捷工具条 |
 | `src/components/LibraryPanel.tsx` | 123 | 素材库面板 |
@@ -730,7 +753,31 @@ sequenceDiagram
 | `src/image-tools/mask/MaskEditorModal.tsx` | 604 | AI 蒙版笔刷编辑器 |
 | `src/image-tools/mask/maskRasterize.ts` | 51 | 蒙版笔划栅格化为 PNG dataURL（`exportMaskToDataURL` / `exportImageMaskToDataURL`） |
 
-### 18.2c `src/canvas/hooks/`（画布交互 hook）
+### 18.2c `src/canvas/`（分层、元素、交互）
+
+| 文件 | 行数 | 职责 |
+|------|------|------|
+| `src/canvas/layers/BackgroundLayer.tsx` | 67 | 背景网格层 |
+| `src/canvas/layers/ContentLayer.tsx` | 10 | 内容层槽位（元素、边、节点由 StageCanvas 注入） |
+| `src/canvas/layers/InteractionLayer.tsx` | 48 | 对齐线、框选、Transformer、临时连线 |
+| `src/canvas/elements/ElementNode.tsx` | 43 | 按 `type` 分发到各 `*ElementNode` |
+| `src/canvas/elements/ImageElementNode.tsx` | 290 | 图片 Konva 节点与裁剪绘制 |
+| `src/canvas/elements/GroupElementNode.tsx` | 248 | 组合容器 |
+| `src/canvas/elements/TextElementNode.tsx` | 102 | 文字 |
+| `src/canvas/elements/RectElementNode.tsx` | 23 | 矩形 |
+| `src/canvas/elements/ArrowElementNode.tsx` | 25 | 箭头 |
+| `src/canvas/elements/commonProps.ts` | 128 | 拖拽/选中/手势历史、`updateElement` 封装 |
+| `src/canvas/elements/getSnap.ts` | 73 | 吸附计算 |
+| `src/canvas/elements/useCanvasImage.ts` | 48 | 图片加载与跨域 |
+| `src/canvas/interaction/AlignmentGuides.tsx` | 27 | 对齐参考线 |
+| `src/canvas/interaction/MarqueeSelection.tsx` | 29 | 框选矩形 |
+| `src/canvas/interaction/SelectionTransformer.tsx` | 54 | Transformer 包装 |
+| `src/canvas/interaction/TemporaryWorkflowConnection.tsx` | 37 | 拖线中的临时贝塞尔 |
+| `src/canvas/utils/coordinates.ts` | 25 | `screenToWorld` / `worldToScreen` |
+| `src/canvas/utils/transformerAnchors.ts` | 103 | 变换锚点样式 |
+| `src/canvas/types.ts` | 4 | 画布局部类型 |
+
+### 18.2d `src/canvas/hooks/`
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
@@ -739,13 +786,27 @@ sequenceDiagram
 | `src/canvas/hooks/useStageWorkflowDblClick.ts` | 27 | 双击空白 Stage → 打开工作流节点选择 |
 | `src/canvas/hooks/useStageTransformer.ts` | 79 | Transformer 与选中节点同步、`transformstart/end`、旋转柄样式 |
 
+### 18.2e `src/ai/`（单步生图与工作流 HTTP）
+
+| 文件 | 行数 | 职责 |
+|------|------|------|
+| `src/ai/api/aiClient.ts` | 18 | 通用 fetch 封装 |
+| `src/ai/api/generationApi.ts` | 67 | `POST /api/generate-image` |
+| `src/ai/generation/AiGenerateModal.tsx` | 305 | 单步生图 Modal UI |
+| `src/ai/generation/generationService.ts` | 179 | 组 payload、请求、结果落画布 |
+| `src/ai/generation/generationPayload.ts` | 56 | 请求体字段 |
+| `src/ai/generation/generationTypes.ts` | 80 | 前端类型 |
+| `src/ai/generation/generationLayout.ts` | 2 | re-export `lib/aiImageLayout` |
+| `src/ai/workflow/api/workflowApi.ts` | 53 | `POST /api/workflow/run-node` |
+| `src/ai/workflow/services/workflowRunner.ts` | 19 | 调用 API、解析响应 |
+| `src/ai/workflow/services/workflowResultToCanvas.ts` | 23 | 节点输出落成 `ImageElement` |
+
 ### 18.3 `src/components/workflow/`
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `src/components/workflow/NodePicker.tsx` | 133 | 拖线创建节点时的类型选择器 |
-| `src/components/workflow/WorkflowCanvas.tsx` | 247 | 独立工作流画布（与统一画布并存时的备用/实验 UI） |
-| `src/components/workflow/WorkflowNodeView.tsx` | 706 | 单个 AI 节点的 Konva 视图与交互 |
+| `src/components/workflow/WorkflowNodeView.tsx` | 714 | 单个 AI 节点的 Konva 视图与交互 |
 
 ### 18.4 `src/editor/`（类型、导出、快捷条）
 
@@ -756,16 +817,14 @@ sequenceDiagram
 | `src/editor/quickTools.ts` | 190 | 快捷条作用域、工具 id 白名单与合并逻辑 |
 | `src/editor/store.ts` | 10 | 对外 re-export store 与工具函数 |
 
-### 18.4b `src/editor/commands/`（阶段 9：手势历史 + 命令入口）
+### 18.4b `src/editor/commands/`（阶段 9：手势历史）
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `src/editor/commands/interactionGestureHistory.ts` | 31 | 拖拽/变换手势内 `commitHistory` 引用计数，避免多选重复入栈 |
-| `src/editor/commands/types.ts` | 18 | `ElementCommand` 描述类型 |
-| `src/editor/commands/executeCommand.ts` | 31 | `executeElementCommand` 分派到现有 slice |
-| `src/editor/commands/elementCommands.ts` | 6 | 再导出手势 API |
-| `src/editor/commands/pageCommands.ts` | 6 | 页面命令占位 |
-| `src/editor/commands/workflowCommands.ts` | 6 | 工作流命令占位 |
+| `src/editor/commands/interactionGestureHistory.ts` | 31 | 拖拽/变换手势内 `commitHistory` 引用计数 |
+| `src/editor/commands/types.ts` | 18 | `ElementCommand` 描述类型（供未来 `executeElementCommand` 使用） |
+
+> `executeCommand.ts`、`pageCommands.ts` 等占位已移至 **`src/_archive/editor/commands/`**。
 
 ### 18.5 `src/editor/store/`（Zustand 拆分）
 
@@ -793,7 +852,7 @@ sequenceDiagram
 | `src/editor/store/slices/uiSlice.ts` | 33 | 快捷条配置、框选与浮动条抑制、`editorMode` |
 | `src/editor/store/slices/pageSlice.ts` | 128 | 页面增删改复制与切换 |
 | `src/editor/store/slices/projectSlice.ts` | 103 | JSON 导入导出、本地与远程保存 |
-| `src/editor/store/slices/workflowSlice.ts` | 433 | 工作流节点/边/连线/运行/结果落画布 |
+| `src/editor/store/slices/workflowSlice.ts` | 406 | 工作流节点/边/连线/运行/结果落画布 |
 
 ### 18.6 `src/lib/`
 
@@ -811,8 +870,6 @@ sequenceDiagram
 | `src/workflow/nodeRegistry.ts` | 38 | `WORKFLOW_NODE_REGISTRY` 与查询辅助函数 |
 | `src/workflow/nodeLayout.ts` | 62 | 节点布局几何（如端口偏移） |
 | `src/workflow/portColors.ts` | 13 | 端口数据类型与描边颜色映射 |
-| `src/workflow/nodes/imageInput.ts` | 27 | 图片输入类节点定义（若有注册） |
-| `src/workflow/nodes/maskInput.ts` | 27 | 蒙版输入类节点定义 |
 | `src/workflow/nodes/inpaint.ts` | 91 | 局部重绘节点定义 |
 | `src/workflow/nodes/outpaint.ts` | 43 | 外扩重绘节点定义 |
 | `src/workflow/nodes/outputView.ts` | 41 | 输出浏览/同步类节点定义 |
@@ -820,13 +877,13 @@ sequenceDiagram
 | `src/workflow/nodes/upscale.ts` | 47 | 超分节点定义 |
 | `src/workflow/utils/createNode.ts` | 54 | 由定义生成运行时 `WorkflowNode` |
 | `src/workflow/utils/runPayload.ts` | 40 | 运行前输入序列化 `serializeWorkflowInputsForApi` |
-| `src/workflow/utils/unifiedGraph.ts` | 323 | 边解析、上游输入、`migrateLegacyWorkflowGraph` 等 |
+| `src/workflow/utils/unifiedGraph.ts` | 325 | 边解析、上游输入、`migrateLegacyWorkflowGraph`（含旧 `image-input`/`mask-input` 类型迁移） |
 
 ### 18.8 `src/app/`（应用壳拆分）
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `src/app/App.tsx` | 217 | 编排入口：`AppShell`、`ContextMenu`、`CanvasArea` 回调、`EditorModals` |
+| `src/app/App.tsx` | 251 | 编排入口：`AppShell`、`ContextMenu`、`CanvasArea` 回调、`EditorModals` |
 | `src/app/AppShell.tsx` | 24 | `figma-app` / `figma-main` 布局与槽位 |
 | `src/app/TopBar.tsx` | 180 | 顶栏工具条与工程导出 |
 | `src/app/LeftSidebar.tsx` | 109 | 左侧大纲与图层行 |
@@ -837,6 +894,21 @@ sequenceDiagram
 | `src/app/hooks/useAppModals.ts` | 75 | Modal / 侧栏 tab / 右键菜单 / toolbar toast / 替换图状态 |
 | `src/app/hooks/useProjectImportExport.ts` | 22 | 工程 JSON 选择 + `readJSONFile` → `loadProjectJSON` |
 | `src/app/hooks/useStageExport.ts` | 25 | `stageRef` → `toDataURL` 导出 PNG/JPG |
+
+### 18.10 `src/_archive/`（不参与构建）
+
+`tsconfig.app.json` 已 `"exclude": ["src/_archive"]`。清单与恢复说明见 **`src/_archive/README.md`**。
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `src/_archive/components/workflow/WorkflowCanvas.tsx` | 248 | 旧独立工作流 Stage，主路径已用统一 `StageCanvas` |
+| `src/_archive/editor/commands/executeCommand.ts` | 31 | `executeElementCommand` 未接入 |
+| `src/_archive/editor/commands/elementCommands.ts` | 6 | 手势 API 再导出（无引用） |
+| `src/_archive/editor/commands/pageCommands.ts` | 6 | 页面命令占位 |
+| `src/_archive/editor/commands/workflowCommands.ts` | 6 | 工作流命令占位 |
+| `src/_archive/ai/workflow/services/workflowValidator.ts` | 5 | 校验占位 |
+| `src/_archive/workflow/nodes/imageInput.ts` | 27 | 旧节点定义（迁移逻辑仍在 `unifiedGraph`） |
+| `src/_archive/workflow/nodes/maskInput.ts` | 27 | 同上 |
 
 ---
 
@@ -949,9 +1021,9 @@ sequenceDiagram
 | `index.html` | 13 | HTML 入口、挂载 `#root` |
 | `package.json` | 31 | 依赖与 npm scripts |
 | `tsconfig.json` | 4 | TS 根配置 |
-| `tsconfig.app.json` | 22 | 应用 TS 编译选项 |
-| `doc/PROJECT_ARCHITECTURE.md` | 909 | 本架构学习文档；含全文清单与行数 |
+| `tsconfig.app.json` | 24 | 应用 TS 编译选项；`exclude: src/_archive` |
+| `doc/PROJECT_ARCHITECTURE.md` | — | 本架构学习文档；含全文清单与行数 |
 
 ---
 
-*文档与仓库同步维护。**行数** 使用 `wc -l` 在文档编写日对应当前工作区统计；合并/重构后请在本机重跑 `find … -exec wc -l` 或 `xargs wc -l` 更新表格。若接口或字段变更，请同时更新「附录 A」与相关章节。*
+*文档与仓库同步维护。**行数** 使用 `wc -l` 统计（2026-05-15）；参与构建源码合计约 **11263** 行，归档约 **356** 行。更新命令示例：`find src -name '*.ts' -o -name '*.tsx' | grep -v _archive | xargs wc -l`。若接口或字段变更，请同时更新「附录 A」、`docs/AI_CONTEXT.md` 与相关章节。*
