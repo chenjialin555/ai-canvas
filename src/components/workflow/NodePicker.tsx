@@ -14,17 +14,11 @@ type Props = {
   onClose: () => void;
 };
 
-const pickerShell: CSSProperties = {
+const pickerPosition: CSSProperties = {
   position: "fixed",
   width: 272,
   maxHeight: 360,
   overflow: "auto",
-  background: "rgba(255, 255, 255, 0.96)",
-  border: "1px solid #dceaea",
-  borderRadius: 14,
-  boxShadow: "0 20px 60px rgba(15, 23, 42, 0.16)",
-  backdropFilter: "blur(14px)",
-  WebkitBackdropFilter: "blur(14px)",
   zIndex: 2000,
   padding: 12,
 };
@@ -68,65 +62,34 @@ export function NodePicker(props: Props) {
       ref={rootRef}
       className="workflow-node-picker"
       style={{
-        ...pickerShell,
+        ...pickerPosition,
         left: Math.min(props.screenX, window.innerWidth - 288),
         top: Math.min(props.screenY, window.innerHeight - 380),
       }}
     >
       <input
         type="search"
+        className="workflow-node-picker__search"
         placeholder="搜索节点…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        style={{
-          width: "100%",
-          marginBottom: 10,
-          padding: "8px 10px",
-          border: "1px solid #e2e8f0",
-          borderRadius: 10,
-          fontSize: 13,
-          outline: "none",
-          background: "rgba(255,255,255,0.9)",
-        }}
       />
       {defs.map((d) => (
         <button
           key={d.type}
           type="button"
+          className="workflow-node-picker__item"
           onClick={() => {
             useEditorStore.getState().createWorkflowNodeFromPicker(d.type);
             props.onClose();
           }}
-          style={{
-            display: "block",
-            width: "100%",
-            textAlign: "left",
-            padding: "10px 8px",
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            borderRadius: 10,
-            transition: "background 0.12s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(53, 199, 201, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
         >
-          <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>
-            {d.title}
-          </div>
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-            {d.description}
-          </div>
+          <div className="workflow-node-picker__title">{d.title}</div>
+          <div className="workflow-node-picker__desc">{d.description}</div>
         </button>
       ))}
       {defs.length === 0 && (
-        <div style={{ fontSize: 12, color: "#94a3b8", padding: "8px 4px" }}>
-          无匹配节点
-        </div>
+        <div className="workflow-node-picker__empty">无匹配节点</div>
       )}
     </div>
   );

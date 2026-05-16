@@ -1,5 +1,8 @@
 import { nanoid } from "nanoid";
+import { computeImageFrameSize } from "../../../lib/aiImageLayout";
 import type { ImageElement } from "../../types";
+
+const DEFAULT_IMAGE_FRAME = computeImageFrameSize(16, 9);
 
 export const fallback = {
   ref1: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=1400",
@@ -49,8 +52,8 @@ export function makeImage(src: string, name = "图片"): ImageElement {
     name,
     x: 420,
     y: 320,
-    width: 520,
-    height: 320,
+    width: DEFAULT_IMAGE_FRAME.width,
+    height: DEFAULT_IMAGE_FRAME.height,
     rotation: 0,
     opacity: 1,
     visible: true,

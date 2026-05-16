@@ -25,7 +25,7 @@ export function TemporaryWorkflowConnection({
     <Line
       bezier
       points={pts}
-      stroke="#42c4c4"
+      stroke="#2f7cff"
       strokeWidth={2}
       strokeScaleEnabled={false}
       dash={[8, 6]}

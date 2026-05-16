@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     )
 
     # --- 网关 Base URL ---
-    comfly_base_url: str = Field(default="https://ai.comfly.chat")
+    comfly_base_url: str = Field(default="https://ai.comfly.org")
     gemini_base_url: str = Field(default="")
     ksyun_base_url: str = Field(default="")
 

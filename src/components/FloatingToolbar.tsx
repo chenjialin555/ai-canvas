@@ -7,6 +7,7 @@ import {
   type QuickTool,
   type QuickToolId,
 } from "../editor/quickTools";
+import { executeElementCommand } from "../editor/commands/executeElementCommand";
 import { useEditorStore } from "../editor/store";
 import type { CanvasElement } from "../editor/types";
 
@@ -98,6 +99,7 @@ type Props = {
   stageRef: MutableRefObject<Stage | null>;
   onCrop: (id: string) => void;
   onMask: (id: string) => void;
+  onParse3d: (id: string) => void;
   onOpenAI: (opts: { imageId: string; mode: "replace-selected" | "new-layer" }) => void;
   onConnect: () => void;
   onReplaceImage: (imageId: string) => void;
@@ -239,13 +241,11 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
     return null;
   }
 
-  const store = useEditorStore.getState();
-
   function runTool(id: QuickToolId) {
     if (n >= 2) {
-      if (id === "group") store.groupSelected();
-      if (id === "copy") store.copy();
-      if (id === "delete") store.removeSelected();
+      if (id === "group") executeElementCommand({ type: "groupSelected" });
+      if (id === "copy") executeElementCommand({ type: "copy" });
+      if (id === "delete") executeElementCommand({ type: "removeSelected" });
       return;
     }
 
@@ -254,6 +254,7 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
 
     if (id === "crop" && el.type === "image") props.onCrop(el.id);
     if (id === "mask" && el.type === "image") props.onMask(el.id);
+    if (id === "parse3d" && el.type === "image") props.onParse3d(el.id);
     if (id === "ai-edit" && el.type === "image") {
       props.onOpenAI({ imageId: el.id, mode: "replace-selected" });
     }
@@ -266,16 +267,16 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
     }
     if (id === "save-library" && el.type === "image") props.onOpenLibrary();
 
-    if (id === "copy") store.copy();
-    if (id === "delete") store.removeSelected();
+    if (id === "copy") executeElementCommand({ type: "copy" });
+    if (id === "delete") executeElementCommand({ type: "removeSelected" });
     if (id === "lock") {
-      store.updateElement(el.id, {
-        locked: !el.locked,
-      } as Partial<CanvasElement>);
+      executeElementCommand({ type: "toggleLock", id: el.id });
     }
-    if (id === "bring-front") store.bringToFront(el.id);
-    if (id === "send-back") store.sendToBack(el.id);
-    if (id === "ungroup" && el.type === "group") store.ungroupSelected();
+    if (id === "bring-front") executeElementCommand({ type: "bringToFront", id: el.id });
+    if (id === "send-back") executeElementCommand({ type: "sendToBack", id: el.id });
+    if (id === "ungroup" && el.type === "group") {
+      executeElementCommand({ type: "ungroupSelected" });
+    }
   }
 
   const bar = (

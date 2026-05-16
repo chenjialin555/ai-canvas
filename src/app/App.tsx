@@ -14,14 +14,15 @@ import { useMemo, useRef } from "react";
 import Konva from "konva";
 import { ContextMenu } from "../components/ContextMenu";
 import { exportCroppedImageAsPNG } from "../editor/export";
+import { executeElementCommand } from "../editor/commands/executeElementCommand";
 import { useEditorStore } from "../editor/store";
-import type { CanvasElement } from "../editor/types";
 import { AppShell } from "./AppShell";
 import { CanvasArea } from "./CanvasArea";
 import { EditorModals } from "./EditorModals";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightSidebar } from "./RightSidebar";
 import { TopBar } from "./TopBar";
+import { loadImageFrameSize } from "../lib/aiImageLayout";
 import { useAppModals } from "./hooks/useAppModals";
 import { useProjectImportExport } from "./hooks/useProjectImportExport";
 import { useStageExport } from "./hooks/useStageExport";
@@ -44,6 +45,21 @@ export default function App() {
     () => page?.elements.find((el) => el.id === selectedIds[0]),
     [page?.elements, selectedIds],
   );
+
+  const contextWorkflowNode = useMemo(() => {
+    if (
+      modals.contextMenu.targetKind !== "workflow-node" ||
+      !modals.contextMenu.targetId ||
+      !page
+    ) {
+      return null;
+    }
+    return page.aiNodes.find((n) => n.id === modals.contextMenu.targetId) ?? null;
+  }, [
+    modals.contextMenu.targetId,
+    modals.contextMenu.targetKind,
+    page?.aiNodes,
+  ]);
 
   /** 右键菜单操作后统一关闭菜单（避免每个 onXxx 重复写 setContextMenu） */
   const closeContextMenu = () =>
@@ -82,6 +98,7 @@ export default function App() {
           onOpenQuickToolbarSettings={() =>
             modals.setQuickToolbarSettingsOpen(true)
           }
+          onOpenSettings={() => modals.setAppearanceSettingsOpen(true)}
           onPickJson={() => project.jsonInputRef.current?.click()}
           exportStage={exportStage}
         />
@@ -94,10 +111,11 @@ export default function App() {
         <CanvasArea
           stageRef={stageRef}
           // --- 来自 StageCanvas / FloatingToolbar 的回调：打开各类编辑器 ---
-          onOpenCropEditor={(id) => modals.setCropEditorImageId(id)}
+          onOpenCropEditor={(id) => modals.openImageEditor(id, "crop")}
           onContextMenu={(params) => {
-            // 右键目标若未在选中集内，先选中再弹菜单（x/y 为屏幕 client 坐标）
-            if (params.targetId) {
+            if (params.targetKind === "workflow-node" && params.targetId) {
+              useEditorStore.getState().setSelectedWorkflowNodeIds([params.targetId]);
+            } else if (params.targetKind === "element" && params.targetId) {
               const st = useEditorStore.getState();
               if (!st.selectedIds.includes(params.targetId)) {
                 st.setSelectedIds([params.targetId]);
@@ -109,10 +127,12 @@ export default function App() {
               x: params.x,
               y: params.y,
               targetId: params.targetId,
+              targetKind: params.targetKind,
             });
           }}
-          onFloatingCrop={(id) => modals.setCropEditorImageId(id)}
-          onFloatingMask={(id) => modals.setMaskEditorImageId(id)}
+          onFloatingCrop={(id) => modals.openImageEditor(id, "crop")}
+          onFloatingMask={(id) => modals.openImageEditor(id, "mask")}
+          onFloatingParse3d={(id) => modals.openImageEditor(id, "parse3d")}
           onFloatingOpenAI={({ imageId, mode }) => {
             useEditorStore.getState().setSelectedIds([imageId]);
             modals.setAiOutputMode(mode);
@@ -158,13 +178,14 @@ export default function App() {
           <ContextMenu
             menu={modals.contextMenu}
             selected={selected}
+            workflowNode={contextWorkflowNode ?? undefined}
             onClose={closeContextMenu}
             onCopy={() => {
-              useEditorStore.getState().copy();
+              executeElementCommand({ type: "copy" });
               closeContextMenu();
             }}
             onPaste={() => {
-              useEditorStore.getState().paste();
+              executeElementCommand({ type: "paste" });
               closeContextMenu();
             }}
             onExportPng={() => {
@@ -174,61 +195,55 @@ export default function App() {
               closeContextMenu();
             }}
             onDelete={() => {
-              useEditorStore.getState().removeSelected();
+              executeElementCommand({ type: "removeSelected" });
               closeContextMenu();
             }}
             onBringToFront={() => {
-              if (selected) useEditorStore.getState().bringToFront(selected.id);
+              if (selected) {
+                executeElementCommand({ type: "bringToFront", id: selected.id });
+              }
               closeContextMenu();
             }}
             onSendToBack={() => {
-              if (selected) useEditorStore.getState().sendToBack(selected.id);
+              if (selected) {
+                executeElementCommand({ type: "sendToBack", id: selected.id });
+              }
               closeContextMenu();
             }}
             onGroup={() => {
-              useEditorStore.getState().groupSelected();
+              executeElementCommand({ type: "groupSelected" });
               closeContextMenu();
             }}
             onUngroup={() => {
-              useEditorStore.getState().ungroupSelected();
+              executeElementCommand({ type: "ungroupSelected" });
               closeContextMenu();
             }}
             onLock={() => {
               if (selected) {
-                useEditorStore.getState().updateElement(selected.id, {
-                  locked: !selected.locked,
-                } as Partial<CanvasElement>);
+                executeElementCommand({ type: "toggleLock", id: selected.id });
               }
               closeContextMenu();
             }}
-            onHide={() => {
+            onToggleVisible={() => {
               if (selected) {
-                useEditorStore.getState().updateElement(selected.id, {
-                  visible: false,
-                } as Partial<CanvasElement>);
+                executeElementCommand({ type: "toggleVisible", id: selected.id });
               }
               closeContextMenu();
             }}
-            onCrop={() => {
+            onFitImageAspect={() => {
               if (selected?.type === "image") {
-                modals.setCropEditorImageId(selected.id);
-              }
-              closeContextMenu();
-            }}
-            onOpenAI={() => {
-              modals.setAiOutputMode("new-layer");
-              modals.setAiOpen(true);
-              closeContextMenu();
-            }}
-            onEditMask={() => {
-              if (selected?.type === "image") {
-                modals.setMaskEditorImageId(selected.id);
+                void loadImageFrameSize(selected.src).then((frame) =>
+                  useEditorStore.getState().fitImageFrame(selected.id, frame),
+                );
               }
               closeContextMenu();
             }}
             onClearMask={() => {
               if (selected?.type === "image" && selected.aiMask) {
-                useEditorStore.getState().clearImageAIMask(selected.id);
+                executeElementCommand({
+                  type: "clearImageAIMask",
+                  id: selected.id,
+                });
               }
               closeContextMenu();
             }}

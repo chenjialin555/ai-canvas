@@ -158,5 +158,34 @@ export function createArrangeSlice(set: StoreSet, get: StoreGet) {
         }),
       );
     },
+
+    reorderRootsByStackOrder: (rootIdsBottomToTop: string[]) => {
+      const page = get().getActivePage();
+      const currentRoots = page.elements
+        .filter((e) => !e.parentId)
+        .map((e) => e.id);
+      if (
+        rootIdsBottomToTop.length !== currentRoots.length ||
+        rootIdsBottomToTop.some((id) => !currentRoots.includes(id)) ||
+        currentRoots.some((id) => !rootIdsBottomToTop.includes(id))
+      ) {
+        return;
+      }
+
+      get().commitHistory();
+
+      set(
+        produce<Store>((state) => {
+          const pg = state.pages.find((p) => p.id === state.activePageId);
+          if (!pg) return;
+          const children = pg.elements.filter((e) => e.parentId);
+          const map = new Map(pg.elements.map((e) => [e.id, e]));
+          pg.elements = rootIdsBottomToTop
+            .map((id) => map.get(id))
+            .filter(Boolean) as typeof pg.elements;
+          pg.elements.push(...children);
+        }),
+      );
+    },
   };
 }

@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { executeElementCommand } from "../editor/commands/executeElementCommand";
 import { useEditorStore } from "../editor/store";
 import { EMPTY_ELEMENTS } from "../editor/store/shallowEqual";
-import type { CanvasElement } from "../editor/types";
 
 function icon(type: string) {
   if (type === "image") return "🖼";
@@ -19,9 +25,18 @@ export function LeftSidebar() {
   });
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const setSelectedIds = useEditorStore((s) => s.setSelectedIds);
-  const updateElement = useEditorStore((s) => s.updateElement);
+  const reorderRootsByStackOrder = useEditorStore(
+    (s) => s.reorderRootsByStackOrder,
+  );
+  const centerViewOnElement = useEditorStore((s) => s.centerViewOnElement);
 
   const [outlineQuery, setOutlineQuery] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const layerRowRefs = useRef(new Map<string, HTMLDivElement>());
 
   const elements = useMemo(
     () => [...pageElements].filter((el) => !el.parentId).reverse(),
@@ -33,6 +48,56 @@ export function LeftSidebar() {
     if (!q) return elements;
     return elements.filter((el) => el.name.toLowerCase().includes(q));
   }, [elements, outlineQuery]);
+
+  const canReorderLayers = outlineQuery.trim() === "";
+
+  useEffect(() => {
+    if (selectedIds.length !== 1) return;
+    const id = selectedIds[0];
+    const row = layerRowRefs.current.get(id);
+    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedIds]);
+
+  const commitRename = useCallback(() => {
+    if (!renamingId) return;
+    const name = renameDraft.trim() || "未命名";
+    executeElementCommand({ type: "renameElement", id: renamingId, name });
+    setRenamingId(null);
+  }, [renamingId, renameDraft]);
+
+  const onLayerDragEnd = useCallback(() => {
+    if (
+      !canReorderLayers ||
+      !draggingId ||
+      !dragOverId ||
+      draggingId === dragOverId
+    ) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+    const displayIds = filteredElements.map((e) => e.id);
+    const i = displayIds.indexOf(draggingId);
+    const j = displayIds.indexOf(dragOverId);
+    if (i < 0 || j < 0) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+    const next = [...displayIds];
+    const [item] = next.splice(i, 1);
+    next.splice(j, 0, item);
+    const stackBottomToTop = [...next].reverse();
+    reorderRootsByStackOrder(stackBottomToTop);
+    setDraggingId(null);
+    setDragOverId(null);
+  }, [
+    canReorderLayers,
+    dragOverId,
+    draggingId,
+    filteredElements,
+    reorderRootsByStackOrder,
+  ]);
 
   return (
     <aside className="left-panel">
@@ -61,9 +126,26 @@ export function LeftSidebar() {
           filteredElements.map((el) => (
             <div
               key={el.id}
-              className={`layer-row ${
-                selectedIds.includes(el.id) ? "selected" : ""
-              }`}
+              ref={(node) => {
+                if (node) layerRowRefs.current.set(el.id, node);
+                else layerRowRefs.current.delete(el.id);
+              }}
+              draggable={canReorderLayers}
+              onDragStart={(e) => {
+                if (!canReorderLayers) return;
+                setDraggingId(el.id);
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", el.id);
+              }}
+              onDragEnter={() => {
+                if (draggingId && draggingId !== el.id) setDragOverId(el.id);
+              }}
+              onDragEnd={onLayerDragEnd}
+              className={`layer-row${
+                selectedIds.includes(el.id) ? " selected" : ""
+              }${!el.visible ? " layer-row--hidden" : ""}${
+                el.locked ? " layer-row--locked" : ""
+              }${dragOverId === el.id ? " layer-row--drag-over" : ""}`}
               onClick={(e) => {
                 if (e.shiftKey) {
                   if (selectedIds.includes(el.id)) {
@@ -77,30 +159,78 @@ export function LeftSidebar() {
               }}
             >
               <span>{icon(el.type)}</span>
-              <span className="layer-name">{el.name}</span>
+              {renamingId === el.id ? (
+                <input
+                  className="layer-rename-input"
+                  value={renameDraft}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename();
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setRenamingId(null);
+                    }
+                  }}
+                />
+              ) : (
+                <span
+                  className="layer-name"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setRenamingId(el.id);
+                    setRenameDraft(el.name);
+                  }}
+                >
+                  {el.name}
+                </span>
+              )}
 
               <button
                 type="button"
+                className="layer-btn"
+                title="在画布中定位"
+                aria-label="在画布中定位"
                 onClick={(e) => {
                   e.stopPropagation();
-                  updateElement(el.id, {
-                    locked: !el.locked,
-                  } as Partial<CanvasElement>);
+                  setSelectedIds([el.id]);
+                  centerViewOnElement(el.id);
                 }}
               >
-                {el.locked ? "锁" : "开"}
+                ⊕
               </button>
 
               <button
                 type="button"
+                className="layer-btn"
+                title={el.locked ? "解锁图层" : "锁定图层"}
+                aria-label={el.locked ? "解锁图层" : "锁定图层"}
+                aria-pressed={el.locked}
                 onClick={(e) => {
                   e.stopPropagation();
-                  updateElement(el.id, {
-                    visible: !el.visible,
-                  } as Partial<CanvasElement>);
+                  executeElementCommand({ type: "toggleLock", id: el.id });
                 }}
               >
-                {el.visible ? "显" : "隐"}
+                {el.locked ? "🔒" : "🔓"}
+              </button>
+
+              <button
+                type="button"
+                className="layer-btn"
+                title={el.visible ? "隐藏图层" : "显示图层"}
+                aria-label={el.visible ? "隐藏图层" : "显示图层"}
+                aria-pressed={!el.visible}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  executeElementCommand({ type: "toggleVisible", id: el.id });
+                }}
+              >
+                {el.visible ? "👁" : "🚫"}
               </button>
             </div>
           ))

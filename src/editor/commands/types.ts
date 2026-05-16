@@ -13,6 +13,22 @@ export type ElementCommand =
       history?: boolean;
     }
   | { type: "removeSelected" }
+  | { type: "copy" }
+  | { type: "paste" }
+  | { type: "bringToFront"; id: string }
+  | { type: "sendToBack"; id: string }
+  | { type: "bringForward"; id: string }
+  | { type: "sendBackward"; id: string }
+  | { type: "toggleLock"; id: string }
+  | { type: "toggleVisible"; id: string }
+  | { type: "renameElement"; id: string; name: string }
+  | { type: "groupSelected" }
+  | { type: "ungroupSelected" }
+  | {
+      type: "alignSelected";
+      align: "left" | "center" | "right" | "top" | "middle" | "bottom";
+    }
+  | { type: "distributeSelected"; distribute: "horizontal" | "vertical" }
   | { type: "replaceImageKeepFrame"; id: string; src: string }
   | { type: "setImageAIMask"; id: string; mask: ImageMaskData | null }
   | { type: "clearImageAIMask"; id: string };

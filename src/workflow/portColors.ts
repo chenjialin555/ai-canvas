@@ -1,7 +1,7 @@
 import type { WorkflowDataType } from "./types";
 
 export const PORT_COLORS: Record<WorkflowDataType, string> = {
-  image: "#4aa3ff",
+  image: "#2f7cff",
   mask: "#ff4d6d",
   text: "#facc15",
   number: "#34d399",

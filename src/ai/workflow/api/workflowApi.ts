@@ -1,4 +1,5 @@
 import { apiPostJson } from "../../api/aiClient";
+import { normalizeAiError } from "../../errors/normalizeAiError";
 
 export type WorkflowRunNodePayload = {
   nodeType: string;
@@ -32,22 +33,31 @@ export async function postWorkflowRunNode(
     try {
       data = JSON.parse(text) as typeof data;
     } catch {
-      return { ok: false, message: `非 JSON 响应: ${text.slice(0, 200)}` };
+      return {
+        ok: false,
+        message: normalizeAiError(
+          { reason: "not_json", message: text },
+          "工作流接口返回格式异常",
+        ),
+      };
     }
     if (!res.ok) {
       return {
         ok: false,
-        message:
-          typeof data.detail === "string"
-            ? data.detail
-            : `HTTP ${res.status}`,
+        message: normalizeAiError(
+          { status: res.status, detail: data.detail },
+          `工作流节点运行失败（HTTP ${res.status}）`,
+        ),
       };
     }
     return { ok: true, outputs: (data.outputs ?? {}) as Record<string, unknown> };
   } catch (e) {
     return {
       ok: false,
-      message: e instanceof Error ? e.message : String(e),
+      message: normalizeAiError(
+        e instanceof Error ? e : String(e),
+        "工作流节点运行失败",
+      ),
     };
   }
 }

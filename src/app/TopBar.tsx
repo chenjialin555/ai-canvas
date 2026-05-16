@@ -2,11 +2,13 @@ import { nanoid } from "nanoid";
 import { downloadJSON } from "../editor/export";
 import { getImageDefaults, useEditorStore } from "../editor/store";
 import type { CanvasElement } from "../editor/types";
+import { loadImageFrameSize } from "../lib/aiImageLayout";
 
 type TopBarProps = {
   onOpenLibrary: () => void;
   onOpenAi: () => void;
   onOpenQuickToolbarSettings: () => void;
+  onOpenSettings: () => void;
   onPickJson: () => void;
   exportStage: (type: "png" | "jpg") => void;
 };
@@ -27,7 +29,7 @@ export function TopBar(props: TopBarProps) {
       opacity: 1,
       visible: true,
       locked: false,
-      fill: "#42c4c4",
+      fill: "#2f7cff",
       radius: 0,
     });
   }
@@ -72,20 +74,23 @@ export function TopBar(props: TopBarProps) {
     });
   }
 
-  function addImage() {
+  async function addImage() {
+    const src =
+      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400";
+    const frame = await loadImageFrameSize(src);
     store.addElement({
       id: nanoid(),
       type: "image",
       name: "图片",
       x: 420,
       y: 320,
-      width: 520,
-      height: 320,
+      width: frame.width,
+      height: frame.height,
       rotation: 0,
       opacity: 1,
       visible: true,
       locked: false,
-      src: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400",
+      src,
       ...getImageDefaults(),
     } as CanvasElement);
   }
@@ -125,6 +130,9 @@ export function TopBar(props: TopBarProps) {
         </button>
         <button type="button" onClick={props.onOpenQuickToolbarSettings}>
           快捷工具条
+        </button>
+        <button type="button" onClick={props.onOpenSettings}>
+          设置
         </button>
 
         <span className="sep" />

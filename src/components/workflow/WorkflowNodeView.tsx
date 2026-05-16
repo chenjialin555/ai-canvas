@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from "react-konva";
+import type Konva from "konva";
 import { useEditorStore } from "../../editor/store";
 import {
   gestureHistoryDragEnd,
@@ -17,6 +18,8 @@ import {
   aiInputPortCenterLocal,
   aiOutputPortCenterLocal,
 } from "../../workflow/nodeLayout";
+import { useWorkflowNodeTheme } from "../../hooks/useWorkflowNodeTheme";
+import { extFromImageUrl, randomImageFilename } from "../../lib/randomFilename";
 import { PORT_COLORS } from "../../workflow/portColors";
 import type { WorkflowNode, WorkflowNodeDefinition } from "../../workflow/types";
 
@@ -25,23 +28,11 @@ type Props = {
 };
 
 const PORT_RADIUS = 6;
-const CARD_RADIUS = 14;
-const CARD_STROKE = 1.5;
+const PORT_GLOW = 4;
+const CARD_STROKE = 1;
 
 /** 仅画布缩得很小时再隐藏节点正文（预览/参数等）；默认 zoom=0.45，若用 0.45 作阈值会「略缩小就整块空白」 */
 const COMPACT_BODY_ZOOM_THRESHOLD = 0.2;
-
-const NODE_STYLE = {
-  bg: "#ffffff",
-  bgSoft: "#f8fbfb",
-  border: "#dbe9e9",
-  borderSelected: "#35c7c9",
-  title: "#0f172a",
-  muted: "#64748b",
-  accent: "#35c7c9",
-  accentSoft: "#e6fbfb",
-  danger: "#ef4444",
-};
 
 function safeDim(v: unknown, fallback: number): number {
   if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
@@ -91,19 +82,6 @@ function formatParamSnippets(
   return lines;
 }
 
-function statusDotColor(status: WorkflowNode["status"]): string {
-  switch (status) {
-    case "running":
-      return "#f59e0b";
-    case "success":
-      return "#22c55e";
-    case "error":
-      return NODE_STYLE.danger;
-    default:
-      return "#94a3b8";
-  }
-}
-
 function statusText(status: WorkflowNode["status"]): string {
   switch (status) {
     case "running":
@@ -117,6 +95,43 @@ function statusText(status: WorkflowNode["status"]): string {
     default:
       return "空闲";
   }
+}
+
+type PortCircleProps = {
+  x: number;
+  y: number;
+  color: string;
+  stroke: string;
+  onMouseDown?: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onMouseUp?: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+};
+
+function PortCircle(props: PortCircleProps) {
+  return (
+    <>
+      <Circle
+        x={props.x}
+        y={props.y}
+        radius={PORT_RADIUS + PORT_GLOW}
+        fill={props.color}
+        opacity={0.2}
+        listening={false}
+      />
+      <Circle
+        x={props.x}
+        y={props.y}
+        radius={PORT_RADIUS}
+        fill={props.color}
+        stroke={props.stroke}
+        strokeWidth={2}
+        shadowBlur={4}
+        shadowOpacity={0.15}
+        shadowColor={props.color}
+        onMouseDown={props.onMouseDown}
+        onMouseUp={props.onMouseUp}
+      />
+    </>
+  );
 }
 
 /** 预览区内按宽高比缩放（contain），返回相对节点局部的绘制矩形 */
@@ -143,11 +158,8 @@ function previewImageContainRect(
 }
 
 /** 下载远程图像（失败则改为新窗口打开） */
-async function downloadImageFromUrl(url: string, filename: string): Promise<void> {
-  const safe =
-    filename.replace(/[^\w.\-]+/g, "_").slice(0, 96) || "image";
-  const name =
-    /\.(png|jpe?g|webp|gif)$/i.test(safe) ? safe : `${safe}.png`;
+async function downloadImageFromUrl(url: string): Promise<void> {
+  const name = randomImageFilename(extFromImageUrl(url));
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(String(res.status));
@@ -165,6 +177,7 @@ async function downloadImageFromUrl(url: string, filename: string): Promise<void
 }
 
 export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
+  const theme = useWorkflowNodeTheme();
   const node = useEditorStore((s) => {
     const page = s.pages.find((p) => p.id === s.activePageId);
     return page?.aiNodes.find((n) => n.id === props.nodeId);
@@ -223,7 +236,6 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
 
   if (!node || !def) return null;
 
-  const stroke = selected ? NODE_STYLE.borderSelected : NODE_STYLE.border;
   const compact = zoom < COMPACT_BODY_ZOOM_THRESHOLD;
   const zLay = Math.max(0.45, Math.min(zoom, 4));
   const fs = (screenPx: number) =>
@@ -314,14 +326,20 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
       ? runBarY - fs(13) - 8
       : 0;
 
-  const topStripFill =
+  const statusPill = theme.statusPill(node.status);
+  const statusLabel = statusText(node.status);
+  const statusPillW = Math.min(72, 28 + statusLabel.length * 11);
+  const cardRadius = theme.cardRadius;
+  const previewRadius = theme.previewRadius;
+  const topBarStops =
     node.status === "running"
-      ? "#fcd34d"
+      ? ([0, theme.barRunning[0], 1, theme.barRunning[1]] as const)
       : selected
-        ? NODE_STYLE.borderSelected
-        : NODE_STYLE.border;
+        ? ([0, theme.barSelected[0], 1, theme.barSelected[1]] as const)
+        : ([0, theme.barIdle[0], 1, theme.barIdle[1]] as const);
 
   const showRunBar = def.executor !== "none" || Boolean(def.showRunBar);
+  const runBtnW = nw - 28;
 
   const runPrimaryLabel =
     def.type === "output-view"
@@ -336,6 +354,8 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
 
   return (
     <Group
+      id={node.id}
+      name="workflow-node"
       x={node.x}
       y={node.y}
       draggable
@@ -360,52 +380,70 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
       }}
       onMouseDown={() => setSel([node.id])}
     >
+      {/* 底层柔阴影 */}
       <Rect
         width={nw}
         height={nh}
-        fill={NODE_STYLE.bg}
-        cornerRadius={CARD_RADIUS}
-        stroke={stroke}
-        strokeWidth={CARD_STROKE}
-        shadowBlur={selected ? 20 : 12}
-        shadowOpacity={selected ? 0.22 : 0.12}
+        cornerRadius={cardRadius}
+        fill={theme.bg}
+        shadowBlur={selected ? 28 : 18}
+        shadowOpacity={selected ? 0.16 : 0.09}
         shadowOffsetX={0}
-        shadowOffsetY={6}
-        shadowColor="rgba(15,23,42,0.2)"
+        shadowOffsetY={selected ? 10 : 6}
+        shadowColor={selected ? theme.shadowSelected : theme.shadow}
+        listening={false}
       />
 
+      <Rect
+        width={nw}
+        height={nh}
+        fill={theme.bg}
+        cornerRadius={cardRadius}
+        stroke={selected ? theme.borderSelected : theme.border}
+        strokeWidth={selected ? 1.5 : CARD_STROKE}
+        opacity={selected ? 1 : 0.98}
+      />
+
+      {/* 顶栏渐变条 */}
       <Rect
         x={0}
         y={0}
         width={nw}
-        height={5}
-        fill={topStripFill}
-        cornerRadius={[CARD_RADIUS, CARD_RADIUS, 0, 0]}
+        height={3}
+        cornerRadius={[cardRadius, cardRadius, 0, 0]}
+        fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+        fillLinearGradientEndPoint={{ x: nw, y: 0 }}
+        fillLinearGradientColorStops={[...topBarStops]}
+        listening={false}
+      />
+
+      <Rect
+        x={0}
+        y={3}
+        width={nw}
+        height={AI_NODE_HEADER_H - 3}
+        fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+        fillLinearGradientEndPoint={{ x: 0, y: AI_NODE_HEADER_H }}
+        fillLinearGradientColorStops={[0, theme.headerFrom, 1, theme.headerTo]}
+        listening={false}
       />
 
       {node.status === "running" && (
         <Rect
           x={12}
-          y={AI_NODE_HEADER_H - 3}
+          y={AI_NODE_HEADER_H - 4}
           width={(nw - 24) * 0.42}
           height={3}
-          fill="#f59e0b"
+          fill={theme.barRunning[1]}
           cornerRadius={2}
           listening={false}
+          opacity={0.85}
         />
       )}
 
-      <Rect
-        x={0}
-        y={5}
-        width={nw}
-        height={AI_NODE_HEADER_H - 5}
-        fill="#f9fcfc"
-      />
-
       <Line
         points={[0, AI_NODE_HEADER_H, nw, AI_NODE_HEADER_H]}
-        stroke="#e2efef"
+        stroke={theme.divider}
         strokeWidth={1}
         listening={false}
       />
@@ -418,29 +456,37 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         height={AI_NODE_HEADER_H - 12}
         verticalAlign="middle"
         fontSize={titleFont}
-        fill={NODE_STYLE.title}
+        fill={theme.title}
         fontStyle="bold"
         ellipsis
         wrap="none"
       />
 
-      <Group x={nw - 76} y={AI_NODE_HEADER_H / 2 - 2}>
-        <Circle
-          x={0}
-          y={0}
-          radius={4}
-          fill={statusDotColor(node.status)}
-          stroke="#fff"
+      <Group x={nw - statusPillW - 10} y={AI_NODE_HEADER_H / 2 - 10}>
+        <Rect
+          width={statusPillW}
+          height={20}
+          fill={statusPill.bg}
+          cornerRadius={10}
+          stroke={statusPill.stroke}
           strokeWidth={1}
           listening={false}
         />
-        <Text
-          text={statusText(node.status)}
+        <Circle
           x={10}
-          y={-7}
-          width={56}
+          y={10}
+          radius={3.5}
+          fill={statusPill.dot}
+          listening={false}
+        />
+        <Text
+          text={statusLabel}
+          x={18}
+          y={5}
+          width={statusPillW - 22}
           fontSize={10}
-          fill={NODE_STYLE.muted}
+          fontStyle="bold"
+          fill={statusPill.fg}
           listening={false}
         />
       </Group>
@@ -450,13 +496,11 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         const col = PORT_COLORS[inp.dataType];
         return (
           <Group key={inp.id}>
-            <Circle
+            <PortCircle
               x={cx}
               y={cy}
-              radius={PORT_RADIUS}
-              fill={col}
-              stroke="#fff"
-              strokeWidth={1.5}
+              color={col}
+              stroke={theme.portStroke}
               onMouseDown={(e) => {
                 e.cancelBubble = true;
                 if (
@@ -487,10 +531,10 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             {!compact && (
               <Text
                 text={inp.label}
-                x={cx + PORT_RADIUS + 8}
+                x={cx + PORT_RADIUS + 10}
                 y={cy - labelFont * 0.45}
                 fontSize={labelFont}
-                fill="#475569"
+                fill={theme.muted}
               />
             )}
           </Group>
@@ -510,16 +554,14 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
                 width={68}
                 align="right"
                 fontSize={labelFont}
-                fill="#475569"
+                fill={theme.muted}
               />
             )}
-            <Circle
+            <PortCircle
               x={cx}
               y={cy}
-              radius={PORT_RADIUS}
-              fill={col}
-              stroke="#fff"
-              strokeWidth={1.5}
+              color={col}
+              stroke={theme.portStroke}
               onMouseDown={(e) => {
                 e.cancelBubble = true;
                 const stage = e.target.getStage();
@@ -546,7 +588,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             y={summaryTop + i * 15}
             width={nw - 28}
             fontSize={11}
-            fill="#334155"
+            fill={theme.muted}
             ellipsis
             listening={false}
           />
@@ -554,11 +596,17 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
 
       {!compact && def.preview?.enabled && (
         <Text
-          text={previewUrl ? "结果预览" : "等待运行结果"}
+          text={
+            previewUrl
+              ? "结果预览"
+              : node.status === "error"
+                ? ""
+                : "等待运行结果"
+          }
           x={12}
           y={previewCaptionY}
           fontSize={11}
-          fill={NODE_STYLE.muted}
+          fill={theme.muted}
           listening={false}
         />
       )}
@@ -570,10 +618,17 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             y={previewBox.by}
             width={previewBox.bw}
             height={previewBox.bh}
-            fill={NODE_STYLE.bgSoft}
-            stroke="#e2efef"
+            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+            fillLinearGradientEndPoint={{ x: previewBox.bw, y: previewBox.bh }}
+            fillLinearGradientColorStops={[
+              0,
+              theme.previewFrom,
+              1,
+              theme.previewTo,
+            ]}
+            stroke={theme.previewBorder}
             strokeWidth={1}
-            cornerRadius={10}
+            cornerRadius={previewRadius + 4}
           />
           {previewImgDraw && (
             <KonvaImage
@@ -582,7 +637,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
               y={previewImgDraw.y}
               width={previewImgDraw.w}
               height={previewImgDraw.h}
-              cornerRadius={6}
+              cornerRadius={previewRadius}
             />
           )}
         </Group>
@@ -595,34 +650,58 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             y={previewY}
             width={previewW}
             height={previewH}
-            fill={NODE_STYLE.bgSoft}
-            stroke="#e2efef"
+            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+            fillLinearGradientEndPoint={{ x: previewW, y: previewH }}
+            fillLinearGradientColorStops={[
+              0,
+              theme.previewFrom,
+              1,
+              theme.previewTo,
+            ]}
+            stroke={theme.previewBorderDashed}
             strokeWidth={1}
-            cornerRadius={10}
-            dash={[4, 4]}
+            cornerRadius={previewRadius + 4}
+            dash={[6, 5]}
           />
+          {node.status === "error" && node.error && (
+            <>
+              <Rect
+                x={16}
+                y={previewY + 10}
+                width={previewW - 8}
+                height={26}
+                fill={theme.errorBg}
+                cornerRadius={previewRadius}
+                stroke={theme.errorBorder}
+                strokeWidth={1}
+                listening={false}
+              />
+              <Text
+                text={node.error.slice(0, 72)}
+                x={22}
+                y={previewY + 17}
+                width={previewW - 20}
+                fontSize={11}
+                fill={theme.errorText}
+                listening={false}
+              />
+            </>
+          )}
           <Text
-            text="运行后显示结果图"
+            text={
+              node.status === "error" && node.error
+                ? ""
+                : "运行后显示结果图"
+            }
             x={12}
             y={previewY + previewH / 2 - 8}
             width={previewW}
             align="center"
             fontSize={12}
-            fill="#94a3b8"
+            fill={theme.muted}
             listening={false}
           />
         </Group>
-      )}
-
-      {!compact && node.status === "error" && node.error && (
-        <Text
-          text={node.error.slice(0, 100)}
-          x={12}
-          y={Math.min(previewY - 4, nh - footerH - 40)}
-          width={nw - 24}
-          fontSize={12}
-          fill={NODE_STYLE.danger}
-        />
       )}
 
       {compact && node.status === "error" && node.error && (
@@ -632,7 +711,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
           y={AI_NODE_HEADER_H + 6}
           width={nw - 20}
           fontSize={10}
-          fill={NODE_STYLE.danger}
+          fill={theme.danger}
           listening={false}
         />
       )}
@@ -644,11 +723,11 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             x={12}
             y={resultLinkY - 20}
             fontSize={12}
-            fill="#0f766e"
+            fill={theme.linkAlt}
             fontStyle="bold"
             onMouseDown={(e) => {
               e.cancelBubble = true;
-              void downloadImageFromUrl(previewUrl, `workflow-${node.id}`);
+              void downloadImageFromUrl(previewUrl);
             }}
           />
           <Text
@@ -656,7 +735,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             x={54}
             y={resultLinkY - 20}
             fontSize={12}
-            fill="#2563eb"
+            fill={theme.link}
             onMouseDown={(e) => {
               e.cancelBubble = true;
               window.open(previewUrl, "_blank", "noopener,noreferrer");
@@ -671,7 +750,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
           x={12}
           y={resultLinkY}
           fontSize={13}
-          fill="#2563eb"
+          fill={theme.link}
           onMouseDown={(e) => {
             e.cancelBubble = true;
             sendCanvas(node.id, "result");
@@ -684,13 +763,13 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         y={nh - footerH}
         width={nw}
         height={footerH}
-        fill={NODE_STYLE.accentSoft}
-        cornerRadius={[0, 0, CARD_RADIUS, CARD_RADIUS]}
+        fill={theme.footerBg}
+        cornerRadius={[0, 0, cardRadius, cardRadius]}
         listening={false}
       />
       <Line
         points={[0, nh - footerH, nw, nh - footerH]}
-        stroke="#dceaea"
+        stroke={theme.divider}
         strokeWidth={1}
         listening={false}
       />
@@ -699,13 +778,20 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         <Group y={runBarY}>
           <Rect
             x={14}
-            width={nw - 28}
+            width={runBtnW}
             height={runBarH}
-            fill={node.status === "running" ? "#94a3b8" : NODE_STYLE.accent}
-            cornerRadius={10}
-            shadowBlur={selected ? 10 : 0}
-            shadowOpacity={0.14}
-            shadowColor="rgba(15,23,42,0.25)"
+            cornerRadius={runBarH / 2}
+            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+            fillLinearGradientEndPoint={{ x: runBtnW, y: runBarH }}
+            fillLinearGradientColorStops={
+              node.status === "running"
+                ? [0, theme.runDisabledFrom, 1, theme.runDisabledTo]
+                : [0, theme.runFrom, 1, theme.runTo]
+            }
+            shadowBlur={8}
+            shadowOpacity={0.22}
+            shadowOffsetY={3}
+            shadowColor={theme.runShadow}
             onMouseDown={(e) => {
               e.cancelBubble = true;
               void runNode(node.id);

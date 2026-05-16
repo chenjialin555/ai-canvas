@@ -133,8 +133,9 @@ export const ImageElementNode = memo(function ImageElementNode(
 
   const isSelected = useEditorStore((s) => s.selectedIds.includes(element.id));
 
+  /** contain：完整显示原图，外框比例由导入时按原图计算 */
   const baseScale = image
-    ? Math.max(element.width / image.width, element.height / image.height)
+    ? Math.min(element.width / image.width, element.height / image.height)
     : 1;
 
   const finalScale = baseScale * (element.cropScale || 1);
@@ -202,6 +203,7 @@ export const ImageElementNode = memo(function ImageElementNode(
       }}
       onDblClick={(e) => {
         e.cancelBubble = true;
+        e.evt.stopPropagation();
         useEditorStore.getState().setSelectedIds([element.id]);
         props.onOpenCropEditor?.(element.id);
       }}
@@ -268,7 +270,7 @@ export const ImageElementNode = memo(function ImageElementNode(
             y={0}
             width={element.width}
             height={element.height}
-            stroke="#42c4c4"
+            stroke="#2f7cff"
             strokeWidth={1}
             cornerRadius={
               element.maskShape === "roundRect" ? element.cornerRadius || 0 : 0

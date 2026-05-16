@@ -25,7 +25,7 @@ export function AlignmentGuides() {
               ? [guide.position, -5000, guide.position, 5000]
               : [-5000, guide.position, 5000, guide.position]
           }
-          stroke="#42c4c4"
+          stroke="#2f7cff"
           strokeWidth={1}
           dash={[6, 4]}
           listening={false}

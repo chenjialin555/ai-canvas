@@ -1,23 +1,37 @@
 import type { CanvasElement } from "../../../editor/types";
-import { makeImage } from "../../../editor/store/helpers/imageDefaults";
+import { getImageDefaults } from "../../../editor/store/helpers/imageDefaults";
+import { loadImageFrameSize } from "../../../lib/aiImageLayout";
+import { nanoid } from "nanoid";
 import type { WorkflowNode } from "../../../workflow/types";
 
 /**
- * 将节点图像类输出落到画布（与原先 `sendWorkflowResultToCanvas` 一致）。
+ * 将节点图像类输出落到画布（外框按输出图原始比例，不再固定 520×320）。
  */
-export function sendWorkflowImageResultToCanvas(options: {
+export async function sendWorkflowImageResultToCanvas(options: {
   node: WorkflowNode | undefined;
   outputKey: string;
   addElement: (el: CanvasElement) => void;
-}): void {
+}): Promise<void> {
   const { node, outputKey, addElement } = options;
   if (!node) return;
   const out = node.outputs[outputKey];
   if (!out || out.type !== "image" || !("url" in out)) return;
   const url = out.url;
+  const frame = await loadImageFrameSize(String(url));
+
   addElement({
-    ...makeImage(String(url), "工作流输出"),
+    id: nanoid(),
+    type: "image",
+    name: "工作流输出",
     x: (node?.x ?? 0) + (node?.width ?? 280) + 40,
     y: node?.y ?? 200,
+    width: frame.width,
+    height: frame.height,
+    rotation: 0,
+    opacity: 1,
+    visible: true,
+    locked: false,
+    src: String(url),
+    ...getImageDefaults(),
   } as CanvasElement);
 }

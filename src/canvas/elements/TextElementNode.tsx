@@ -22,7 +22,7 @@ export function TextElementNode(props: TextElementNodeProps) {
           width={el.width}
           height={el.height}
           fill="rgba(255,255,255,0.92)"
-          stroke="#42c4c4"
+          stroke="#2f7cff"
           strokeWidth={2}
         />
         <Text
@@ -53,6 +53,7 @@ export function TextElementNode(props: TextElementNodeProps) {
       verticalAlign="middle"
       onDblClick={(e) => {
         e.cancelBubble = true;
+        e.evt.stopPropagation();
         const stage = e.target.getStage();
         if (!stage) return;
 

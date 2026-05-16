@@ -1447,7 +1447,211 @@ select {
   background: #f9fafb;
 }
 
-/* AI 蒙版编辑器 */
+/* —— 统一图片编辑器（裁剪 / 蒙版 / 解析3D） —— */
+.image-editor-mask {
+  z-index: 100000;
+}
+
+.image-editor {
+  width: calc(100vw - 32px);
+  height: calc(100vh - 32px);
+  max-width: 1400px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #dfe7e7;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.26);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #111827;
+}
+
+.image-editor-head {
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid #edf2f2;
+  background: linear-gradient(180deg, #ffffff, #f8fbfc);
+}
+
+.image-editor-title {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.image-editor-tabs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  min-width: 0;
+}
+
+.image-editor-tabs button {
+  height: 52px;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.image-editor-tabs button.active {
+  color: #42c4c4;
+  border-bottom: 2px solid #42c4c4;
+}
+
+.image-editor-close {
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.image-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f3f6f8;
+}
+
+.image-editor-subbar {
+  flex-shrink: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #edf2f2;
+  background: #fff;
+}
+
+.image-editor-subbar--mask {
+  flex-wrap: wrap;
+}
+
+.image-editor-subbar-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.image-editor-subbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.image-editor-subbar-tools button,
+.image-editor-subbar-actions button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d6e0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.image-editor-subbar-tools button:hover,
+.image-editor-subbar-actions button:hover {
+  background: #f0f7ff;
+  border-color: #b8d4f0;
+}
+
+.image-editor-subbar-tools button.active {
+  background: #e8f7f7;
+  border-color: #42c4c4;
+  color: #0f766e;
+}
+
+.image-editor-subbar-divider {
+  width: 1px;
+  height: 20px;
+  background: #e2e8f0;
+}
+
+.image-editor-subbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.image-editor-subbar-actions button.primary {
+  background: linear-gradient(135deg, #42c4c4, #2f7cff);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(47, 124, 255, 0.2);
+}
+
+.image-editor-panel-row {
+  flex: 1;
+  min-height: 0;
+}
+
+.image-editor .mask-canvas-wrap {
+  background: #e8ecef;
+}
+
+.image-editor .mask-panel {
+  background: #fff;
+  border-left: 1px solid #edf2f2;
+  color: #111827;
+}
+
+.image-editor .mask-panel h3 {
+  color: #111827;
+}
+
+.image-editor .mask-field span {
+  color: #64748b;
+}
+
+.image-editor .mask-tools {
+  background: #fff;
+  border-right: 1px solid #edf2f2;
+}
+
+.image-editor .mask-tools button {
+  color: #64748b;
+}
+
+.image-editor .mask-tools button:hover,
+.image-editor .mask-tools button.selected {
+  background: #e8f7f7;
+  color: #0f766e;
+}
+
+.image-editor .mask-status {
+  background: #fff;
+  border-top: 1px solid #edf2f2;
+  color: #64748b;
+}
+
+.image-editor .crop-toolbar button {
+  border: 1px solid #d6e0e0;
+  background: #fff;
+  color: #374151;
+  border-radius: 8px;
+}
+
+.image-editor .panorama3d-hint {
+  color: #64748b;
+}
+
+/* AI 蒙版编辑器（旧独立弹层，保留兼容） */
 .mask-modal {
   position: fixed;
   inset: 0;
@@ -1586,6 +1790,23 @@ select {
   font-size: 14px;
   margin: 0 0 14px;
   color: #f8fafc;
+}
+
+.panorama3d-viewer-wrap {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.panorama3d-viewer {
+  position: relative;
+  overflow: hidden;
+}
+
+.panorama3d-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
 }
 
 .reset-btn {

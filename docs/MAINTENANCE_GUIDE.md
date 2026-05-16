@@ -1,8 +1,9 @@
 # AI Canvas — 学习与维护手册
 
 > **读者**：需要亲自改代码、查问题、加功能的你。  
-> **风格**：白话 + 步骤；不替代 `doc/PROJECT_ARCHITECTURE.md` 的细表。  
-> **给 AI 的短上下文**：请优先读 `docs/AI_CONTEXT.md`。
+> **风格**：白话 + 步骤；目录全表、env 全表、文件行数见 `doc/PROJECT_ARCHITECTURE.md`。  
+> **给 AI 的短上下文**：请优先读 `docs/AI_CONTEXT.md`。  
+> **去重**：各主题唯一来源见 [`DOC_MAP.md`](DOC_MAP.md)。
 
 ---
 
@@ -17,27 +18,8 @@
 
 ## 2. 如何启动项目？
 
-> **Web / 桌面安装版 / 各启动脚本对照**：见 [`docs/guides/desktop-and-web-startup.md`](./guides/desktop-and-web-startup.md)。
-
-**推荐（脚本会检查依赖）**
-
-```bash
-./start-dev.sh
-```
-
-**或手动**
-
-```bash
-npm install          # 前端依赖
-uv sync              # Python 虚拟环境与后端依赖（若尚未建 .venv）
-npm run dev          # 同时起 Vite + uvicorn（见 package.json）
-```
-
-**默认地址（未改端口时）**
-
-- 前端：Vite 开发服务器（常见为 `http://localhost:5173`，以终端输出为准）。  
-- 后端：`http://localhost:13555`（可用环境变量 `API_PORT` 改，见 `start-dev.sh` / `vite.config.ts`）。  
-- 浏览器里请求 **`/api/...`** 会由 Vite **代理**到上述后端端口。
+安装、启动、验证清单见 [**guides/getting-started.md**](guides/getting-started.md)。  
+Web / 桌面 / 打包脚本对照见 [**guides/desktop-and-web-startup.md**](guides/desktop-and-web-startup.md)（**不在此重复命令表**）。
 
 ---
 
@@ -67,6 +49,8 @@ npm run dev          # 同时起 Vite + uvicorn（见 package.json）
 
 ## 5. 前端整体结构怎么读？（找代码地图）
 
+**逐文件路径 + 行数 + 一句话职责**：见 [`doc/PROJECT_ARCHITECTURE.md`](../doc/PROJECT_ARCHITECTURE.md) **[§18 前端源码文件全表](../doc/PROJECT_ARCHITECTURE.md#18-前端源码文件全表)**（后端见 **§19**）。下面按「我想改什么」列入口（与全表互补，不重复列文件名）。
+
 | 我想… | 先看 |
 |--------|------|
 | 改画布主流程、滚轮、空格、拖图进画布 | `src/components/StageCanvas.tsx`、`src/canvas/hooks/*` |
@@ -76,7 +60,7 @@ npm run dev          # 同时起 Vite + uvicorn（见 package.json）
 | 改单步生图表单或请求前后逻辑 | `src/ai/generation/` |
 | 改工作流节点外观、端口 | `src/components/workflow/WorkflowNodeView.tsx`、`src/workflow/` |
 | 改工作流运行、报错、写回节点 | `src/editor/store/slices/workflowSlice.ts`、`src/ai/workflow/` |
-| 改裁剪 / 蒙版编辑器 | `src/image-tools/` |
+| 改裁剪 / 蒙版 / 解析3D 全景 | `src/image-tools/`（主路径：`ImageEditorModal` + `*Panel.tsx`；遗留：`CropEditorModal` / `MaskEditorModal`） |
 | 改后端接口或模型 | `backend/app/` |
 
 ---
@@ -148,8 +132,8 @@ npm run dev          # 同时起 Vite + uvicorn（见 package.json）
 
 已在第 5 节表格列出；再补三条高频：
 
-- **右键菜单**：`ContextMenu` + `app/App.tsx` 里传入的回调。  
-- **浮动工具条**：`FloatingToolbar.tsx`。  
+- **右键菜单**：`ContextMenu` + `app/App.tsx` 里传入的回调（图片类「裁剪 / AI 生图 / 蒙版」已移除，改由 **浮动快捷条** + `ImageEditorModal`）。  
+- **浮动工具条**：`FloatingToolbar.tsx`、`editor/quickTools.ts`（含 `parse3d` 等工具 id）。  
 - **快捷键（撤销、全选、空格等）**：主要在 `StageCanvas` 的 `useEffect`（与画布强相关）。
 
 ---
@@ -177,7 +161,7 @@ npm run dev          # 同时起 Vite + uvicorn（见 package.json）
 
 ## 15. 后续路线图（与仓库 checklist 对齐）
 
-详见 **`docs/ROADMAP.md`**（短清单）与 **`doc/阶段性修改计划.md`**（带完成记录）。
+详见 **`docs/ROADMAP.md`**（阶段 checklist）。
 
 **当前**：阶段 1～9 已完成；阶段 10（统一两套 AI）为 **长期 backlog**，未在代码里实现。
 

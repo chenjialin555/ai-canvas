@@ -1,19 +1,21 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ContextMenuState } from "../../components/ContextMenu";
+import type { ImageEditorTool } from "../../image-tools/types";
 
 export type RightPanelTab = "properties" | "aiGenerate" | "aiChat";
+
+export type ImageEditorState = {
+  imageId: string;
+  tool: ImageEditorTool;
+} | null;
 
 export function useAppModals() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [maskEditorImageId, setMaskEditorImageId] = useState<string | null>(
-    null,
-  );
-  const [cropEditorImageId, setCropEditorImageId] = useState<string | null>(
-    null,
-  );
+  const [imageEditor, setImageEditor] = useState<ImageEditorState>(null);
   const [quickToolbarSettingsOpen, setQuickToolbarSettingsOpen] =
     useState(false);
+  const [appearanceSettingsOpen, setAppearanceSettingsOpen] = useState(false);
   const [aiOutputMode, setAiOutputMode] = useState<
     "new-layer" | "replace-selected"
   >("new-layer");
@@ -25,14 +27,28 @@ export function useAppModals() {
   const replaceImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [rightTab, setRightTab] = useState<RightPanelTab>("properties");
-  const [aiChatAttachmentIds, setAiChatAttachmentIds] = useState<string[]>([]);
+  const [aiChatAttachmentIds, setAiChatAttachmentIds] = useState<string[]>(
+    [],
+  );
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
     y: 0,
     targetId: null,
+    targetKind: "empty",
   });
+
+  const openImageEditor = useCallback(
+    (imageId: string, tool: ImageEditorTool) => {
+      setImageEditor({ imageId, tool });
+    },
+    [],
+  );
+
+  const closeImageEditor = useCallback(() => {
+    setImageEditor(null);
+  }, []);
 
   function addToAiChat(id: string) {
     setAiChatAttachmentIds((prev) =>
@@ -50,12 +66,14 @@ export function useAppModals() {
     setLibraryOpen,
     aiOpen,
     setAiOpen,
-    maskEditorImageId,
-    setMaskEditorImageId,
-    cropEditorImageId,
-    setCropEditorImageId,
+    imageEditor,
+    setImageEditor,
+    openImageEditor,
+    closeImageEditor,
     quickToolbarSettingsOpen,
     setQuickToolbarSettingsOpen,
+    appearanceSettingsOpen,
+    setAppearanceSettingsOpen,
     aiOutputMode,
     setAiOutputMode,
     toolbarToast,

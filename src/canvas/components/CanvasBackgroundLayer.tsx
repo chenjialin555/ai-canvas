@@ -16,9 +16,9 @@ const StaticGrid = memo(function StaticGrid() {
       <Line
         key={`v-${i}`}
         points={[i, -GRID_H, i, GRID_H]}
-        stroke={i % 120 === 0 ? "#d2e2e2" : "#dceaea"}
+        stroke={i % 120 === 0 ? "#c8dce8" : "#d8e8ee"}
         strokeWidth={1}
-        opacity={i % 120 === 0 ? 0.55 : 0.35}
+        opacity={i % 120 === 0 ? 0.4 : 0.22}
         listening={false}
         perfectDrawEnabled={false}
       />,
@@ -29,9 +29,9 @@ const StaticGrid = memo(function StaticGrid() {
       <Line
         key={`h-${j}`}
         points={[-GRID_W, j, GRID_W, j]}
-        stroke={j % 120 === 0 ? "#d2e2e2" : "#dceaea"}
+        stroke={j % 120 === 0 ? "#c8dce8" : "#d8e8ee"}
         strokeWidth={1}
-        opacity={j % 120 === 0 ? 0.55 : 0.35}
+        opacity={j % 120 === 0 ? 0.4 : 0.22}
         listening={false}
         perfectDrawEnabled={false}
       />,

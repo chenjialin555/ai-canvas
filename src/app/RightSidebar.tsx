@@ -1,7 +1,9 @@
 import { AiChatPanel } from "../components/AiChatPanel";
+import { executeElementCommand } from "../editor/commands/executeElementCommand";
 import { exportCroppedImageAsPNG } from "../editor/export";
 import { useEditorStore } from "../editor/store";
 import type { CanvasElement, ImageElement } from "../editor/types";
+import { loadImageFrameSize, replaceImageWithFitFrame } from "../lib/aiImageLayout";
 import type { RightPanelTab } from "./hooks/useAppModals";
 
 export function RightSidebar(props: {
@@ -16,9 +18,19 @@ export function RightSidebar(props: {
   const pg = store.getActivePage();
   const selected = pg.elements.find((el) => el.id === store.selectedIds[0]);
 
-  function patch(data: Partial<CanvasElement>) {
+  /** 连续拖拽/输入时用 `history: false`，在 blur / mouseup 再 `commitInputGesture()`，避免 undo 一步撤销十次。 */
+  function commitInputGesture() {
+    useEditorStore.getState().commitHistory();
+  }
+
+  function patch(data: Partial<CanvasElement>, history = true) {
     if (!selected) return;
-    store.updateElement(selected.id, data);
+    executeElementCommand({
+      type: "updateElement",
+      id: selected.id,
+      patch: data,
+      history,
+    });
   }
 
   return (
@@ -72,23 +84,34 @@ export function RightSidebar(props: {
           <div className="layer-actions">
             <button
               type="button"
-              onClick={() => store.bringForward(selected.id)}
+              onClick={() =>
+                executeElementCommand({ type: "bringForward", id: selected.id })
+              }
             >
               上移
             </button>
             <button
               type="button"
-              onClick={() => store.sendBackward(selected.id)}
+              onClick={() =>
+                executeElementCommand({ type: "sendBackward", id: selected.id })
+              }
             >
               下移
             </button>
             <button
               type="button"
-              onClick={() => store.bringToFront(selected.id)}
+              onClick={() =>
+                executeElementCommand({ type: "bringToFront", id: selected.id })
+              }
             >
               置顶
             </button>
-            <button type="button" onClick={() => store.sendToBack(selected.id)}>
+            <button
+              type="button"
+              onClick={() =>
+                executeElementCommand({ type: "sendToBack", id: selected.id })
+              }
+            >
               置底
             </button>
           </div>
@@ -99,49 +122,80 @@ export function RightSidebar(props: {
               <div className="align-grid">
                 <button
                   type="button"
-                  onClick={() => store.alignSelected("left")}
+                  onClick={() =>
+                    executeElementCommand({ type: "alignSelected", align: "left" })
+                  }
                 >
                   左
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.alignSelected("center")}
+                  onClick={() =>
+                    executeElementCommand({
+                      type: "alignSelected",
+                      align: "center",
+                    })
+                  }
                 >
                   水平中
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.alignSelected("right")}
+                  onClick={() =>
+                    executeElementCommand({ type: "alignSelected", align: "right" })
+                  }
                 >
                   右
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.alignSelected("top")}
+                  onClick={() =>
+                    executeElementCommand({ type: "alignSelected", align: "top" })
+                  }
                 >
                   上
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.alignSelected("middle")}
+                  onClick={() =>
+                    executeElementCommand({
+                      type: "alignSelected",
+                      align: "middle",
+                    })
+                  }
                 >
                   垂直中
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.alignSelected("bottom")}
+                  onClick={() =>
+                    executeElementCommand({
+                      type: "alignSelected",
+                      align: "bottom",
+                    })
+                  }
                 >
                   下
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.distributeSelected("horizontal")}
+                  onClick={() =>
+                    executeElementCommand({
+                      type: "distributeSelected",
+                      distribute: "horizontal",
+                    })
+                  }
                 >
                   水平分布
                 </button>
                 <button
                   type="button"
-                  onClick={() => store.distributeSelected("vertical")}
+                  onClick={() =>
+                    executeElementCommand({
+                      type: "distributeSelected",
+                      distribute: "vertical",
+                    })
+                  }
                 >
                   垂直分布
                 </button>
@@ -156,29 +210,34 @@ export function RightSidebar(props: {
               <Num
                 label="X"
                 value={selected.x}
-                onChange={(v) => patch({ x: v })}
+                onChange={(v) => patch({ x: v }, false)}
+                onCommit={commitInputGesture}
               />
               <Num
                 label="Y"
                 value={selected.y}
-                onChange={(v) => patch({ y: v })}
+                onChange={(v) => patch({ y: v }, false)}
+                onCommit={commitInputGesture}
               />
               <Num
                 label="宽"
                 value={selected.width}
-                onChange={(v) => patch({ width: v })}
+                onChange={(v) => patch({ width: v }, false)}
+                onCommit={commitInputGesture}
               />
               <Num
                 label="高"
                 value={selected.height}
-                onChange={(v) => patch({ height: v })}
+                onChange={(v) => patch({ height: v }, false)}
+                onCommit={commitInputGesture}
               />
             </div>
 
             <Num
               label="旋转"
               value={selected.rotation}
-              onChange={(v) => patch({ rotation: v })}
+              onChange={(v) => patch({ rotation: v }, false)}
+              onCommit={commitInputGesture}
             />
 
             <label className="field">
@@ -189,7 +248,11 @@ export function RightSidebar(props: {
                 max={1}
                 step={0.01}
                 value={selected.opacity}
-                onChange={(e) => patch({ opacity: Number(e.target.value) })}
+                onChange={(e) =>
+                  patch({ opacity: Number(e.target.value) }, false)
+                }
+                onMouseUp={commitInputGesture}
+                onTouchEnd={commitInputGesture}
               />
             </label>
 
@@ -212,10 +275,9 @@ export function RightSidebar(props: {
                   type="color"
                   value={selected.fill}
                   onChange={(e) =>
-                    store.updateElement(selected.id, {
-                      fill: e.target.value,
-                    } as Partial<CanvasElement>)
+                    patch({ fill: e.target.value } as Partial<CanvasElement>, false)
                   }
+                  onBlur={commitInputGesture}
                 />
               </label>
 
@@ -223,10 +285,9 @@ export function RightSidebar(props: {
                 label="圆角"
                 value={selected.radius}
                 onChange={(v) =>
-                  store.updateElement(selected.id, {
-                    radius: v,
-                  } as Partial<CanvasElement>)
+                  patch({ radius: v } as Partial<CanvasElement>, false)
                 }
+                onCommit={commitInputGesture}
               />
             </section>
           )}
@@ -239,10 +300,9 @@ export function RightSidebar(props: {
                 <textarea
                   value={selected.text}
                   onChange={(e) =>
-                    store.updateElement(selected.id, {
-                      text: e.target.value,
-                    } as Partial<CanvasElement>)
+                    patch({ text: e.target.value } as Partial<CanvasElement>, false)
                   }
+                  onBlur={commitInputGesture}
                 />
               </label>
 
@@ -250,10 +310,9 @@ export function RightSidebar(props: {
                 label="字号"
                 value={selected.fontSize}
                 onChange={(v) =>
-                  store.updateElement(selected.id, {
-                    fontSize: v,
-                  } as Partial<CanvasElement>)
+                  patch({ fontSize: v } as Partial<CanvasElement>, false)
                 }
+                onCommit={commitInputGesture}
               />
 
               <label className="field">
@@ -262,10 +321,9 @@ export function RightSidebar(props: {
                   type="color"
                   value={selected.color}
                   onChange={(e) =>
-                    store.updateElement(selected.id, {
-                      color: e.target.value,
-                    } as Partial<CanvasElement>)
+                    patch({ color: e.target.value } as Partial<CanvasElement>, false)
                   }
+                  onBlur={commitInputGesture}
                 />
               </label>
             </section>
@@ -280,10 +338,12 @@ export function RightSidebar(props: {
                   type="color"
                   value={selected.stroke}
                   onChange={(e) =>
-                    store.updateElement(selected.id, {
-                      stroke: e.target.value,
-                    } as Partial<CanvasElement>)
+                    patch(
+                      { stroke: e.target.value } as Partial<CanvasElement>,
+                      false,
+                    )
                   }
+                  onBlur={commitInputGesture}
                 />
               </label>
 
@@ -291,10 +351,9 @@ export function RightSidebar(props: {
                 label="线宽"
                 value={selected.strokeWidth}
                 onChange={(v) =>
-                  store.updateElement(selected.id, {
-                    strokeWidth: v,
-                  } as Partial<CanvasElement>)
+                  patch({ strokeWidth: v } as Partial<CanvasElement>, false)
                 }
+                onCommit={commitInputGesture}
               />
             </section>
           )}
@@ -309,7 +368,9 @@ export function RightSidebar(props: {
               <button
                 type="button"
                 className="ghost-full-btn"
-                onClick={() => store.ungroupSelected()}
+                onClick={() =>
+                  executeElementCommand({ type: "ungroupSelected" })
+                }
               >
                 取消组合
               </button>
@@ -325,6 +386,23 @@ function ImageInspector(props: { selected: ImageElement }) {
   const store = useEditorStore();
   const selected = props.selected;
 
+  function commitFilterGesture() {
+    useEditorStore.getState().commitHistory();
+  }
+
+  function patchFilter(
+    next: Partial<NonNullable<ImageElement["filter"]>>,
+  ) {
+    executeElementCommand({
+      type: "updateElement",
+      id: selected.id,
+      patch: {
+        filter: { ...selected.filter, ...next },
+      } as Partial<CanvasElement>,
+      history: false,
+    });
+  }
+
   return (
     <section className="panel">
       <h3>滤镜</h3>
@@ -335,14 +413,8 @@ function ImageInspector(props: { selected: ImageElement }) {
         max={1}
         step={0.01}
         value={selected.filter?.brightness ?? 0}
-        onChange={(v) =>
-          store.updateElement(selected.id, {
-            filter: {
-              ...selected.filter,
-              brightness: v,
-            },
-          } as Partial<CanvasElement>)
-        }
+        onChange={(v) => patchFilter({ brightness: v })}
+        onCommit={commitFilterGesture}
       />
 
       <FilterRange
@@ -351,14 +423,8 @@ function ImageInspector(props: { selected: ImageElement }) {
         max={100}
         step={1}
         value={selected.filter?.contrast ?? 0}
-        onChange={(v) =>
-          store.updateElement(selected.id, {
-            filter: {
-              ...selected.filter,
-              contrast: v,
-            },
-          } as Partial<CanvasElement>)
-        }
+        onChange={(v) => patchFilter({ contrast: v })}
+        onCommit={commitFilterGesture}
       />
 
       <FilterRange
@@ -367,14 +433,8 @@ function ImageInspector(props: { selected: ImageElement }) {
         max={2}
         step={0.01}
         value={selected.filter?.saturation ?? 0}
-        onChange={(v) =>
-          store.updateElement(selected.id, {
-            filter: {
-              ...selected.filter,
-              saturation: v,
-            },
-          } as Partial<CanvasElement>)
-        }
+        onChange={(v) => patchFilter({ saturation: v })}
+        onCommit={commitFilterGesture}
       />
 
       <FilterRange
@@ -383,36 +443,52 @@ function ImageInspector(props: { selected: ImageElement }) {
         max={30}
         step={1}
         value={selected.filter?.blur ?? 0}
-        onChange={(v) =>
-          store.updateElement(selected.id, {
-            filter: {
-              ...selected.filter,
-              blur: v,
-            },
-          } as Partial<CanvasElement>)
-        }
+        onChange={(v) => patchFilter({ blur: v })}
+        onCommit={commitFilterGesture}
       />
 
       <button
         type="button"
         className="ghost-full-btn"
         onClick={() =>
-          store.updateElement(selected.id, {
-            filter: {
-              brightness: 0,
-              contrast: 0,
-              saturation: 0,
-              blur: 0,
-            },
-          } as Partial<CanvasElement>)
+          executeElementCommand({
+            type: "updateElement",
+            id: selected.id,
+            patch: {
+              filter: {
+                brightness: 0,
+                contrast: 0,
+                saturation: 0,
+                blur: 0,
+              },
+            } as Partial<CanvasElement>,
+          })
         }
       >
         重置滤镜
       </button>
 
       <ReplaceImageButton
-        onReplace={(src) => store.replaceImageKeepFrame(selected.id, src)}
+        onReplace={(src) => {
+          void replaceImageWithFitFrame(
+            store.replaceImageFitFrame,
+            selected.id,
+            src,
+          );
+        }}
       />
+
+      <button
+        type="button"
+        className="ghost-full-btn"
+        onClick={() => {
+          void loadImageFrameSize(selected.src).then((frame) =>
+            store.fitImageFrame(selected.id, frame),
+          );
+        }}
+      >
+        适应图片比例
+      </button>
 
       <button
         type="button"
@@ -429,6 +505,7 @@ function Num(props: {
   label: string;
   value: number;
   onChange: (v: number) => void;
+  onCommit?: () => void;
 }) {
   return (
     <label className="field">
@@ -437,6 +514,7 @@ function Num(props: {
         type="number"
         value={Number.isFinite(props.value) ? Math.round(props.value) : 0}
         onChange={(e) => props.onChange(Number(e.target.value))}
+        onBlur={() => props.onCommit?.()}
       />
     </label>
   );
@@ -449,6 +527,7 @@ function FilterRange(props: {
   step: number;
   value: number;
   onChange: (v: number) => void;
+  onCommit?: () => void;
 }) {
   return (
     <label className="field">
@@ -460,6 +539,8 @@ function FilterRange(props: {
         step={props.step}
         value={props.value}
         onChange={(e) => props.onChange(Number(e.target.value))}
+        onMouseUp={() => props.onCommit?.()}
+        onTouchEnd={() => props.onCommit?.()}
       />
     </label>
   );
@@ -468,7 +549,7 @@ function FilterRange(props: {
 function ReplaceImageButton(props: { onReplace: (src: string) => void }) {
   return (
     <label className="ghost-full-btn file-label">
-      替换图片，保持裁剪框
+      替换图片（适应比例）
       <input
         hidden
         type="file"

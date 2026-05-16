@@ -39,10 +39,10 @@ export function SelectionTransformer({
       ]}
       anchorSize={8}
       anchorCornerRadius={2}
-      anchorStroke="#42c4c4"
+      anchorStroke="#2f7cff"
       anchorFill="#ffffff"
-      borderStroke="#42c4c4"
-      borderStrokeWidth={1.5}
+      borderStroke="#2f7cff"
+      borderStrokeWidth={1.4}
       rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
       boundBoxFunc={(oldBox, newBox) => {
         if (selectionHasGroup) return oldBox;

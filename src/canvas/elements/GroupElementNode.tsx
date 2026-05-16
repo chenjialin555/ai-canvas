@@ -94,7 +94,7 @@ function GroupChildImage(props: {
   const img = useCanvasImage(props.child.src);
   const c = props.child;
   const baseScale = img
-    ? Math.max(c.width / img.width, c.height / img.height)
+    ? Math.min(c.width / img.width, c.height / img.height)
     : 1;
   const finalScale = baseScale * (c.cropScale || 1);
 
@@ -228,7 +228,7 @@ export function GroupElementNode(props: GroupElementNodeProps) {
         width={g.width}
         height={g.height}
         fill="rgba(66,196,196,0.06)"
-        stroke="#42c4c4"
+        stroke="#2f7cff"
         dash={[6, 4]}
         strokeWidth={1}
         listening={false}
@@ -242,7 +242,7 @@ export function GroupElementNode(props: GroupElementNodeProps) {
           y={0}
           width={g.width}
           height={g.height}
-          stroke="#42c4c4"
+          stroke="#2f7cff"
           strokeWidth={1}
           listening={false}
         />

@@ -396,7 +396,7 @@ export function createWorkflowSlice(set: StoreSet, get: StoreGet) {
     sendWorkflowResultToCanvas: (nodeId: string, outputKey = "result") => {
       const page = get().getActivePage();
       const node = page.aiNodes.find((n) => n.id === nodeId);
-      sendWorkflowImageResultToCanvas({
+      void sendWorkflowImageResultToCanvas({
         node,
         outputKey,
         addElement: get().addElement,

@@ -11,7 +11,7 @@ export function rotateAnchorSceneFunc(
   const cx = w / 2;
   const cy = h / 2;
   const R = Math.min(w, h) * 0.34;
-  const col = "#42c4c4";
+  const col = "#2f7cff";
 
   ctx.save();
   ctx.translate(cx, cy);

@@ -8,6 +8,7 @@ export type QuickToolbarElementType =
 export type QuickToolId =
   | "crop"
   | "mask"
+  | "parse3d"
   | "ai-edit"
   | "generate-node"
   | "connect"
@@ -42,6 +43,12 @@ export const QUICK_TOOL_LIBRARY: QuickTool[] = [
     id: "mask",
     label: "蒙版",
     icon: "◐",
+    elementTypes: ["image"],
+  },
+  {
+    id: "parse3d",
+    label: "解析3D",
+    icon: "3D",
     elementTypes: ["image"],
   },
   {
@@ -131,6 +138,7 @@ export const DEFAULT_QUICK_TOOLBAR_CONFIG: Record<
   image: [
     "crop",
     "mask",
+    "parse3d",
     "ai-edit",
     "generate-node",
     "connect",

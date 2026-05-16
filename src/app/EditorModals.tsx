@@ -1,9 +1,10 @@
 import { AiGenerateModal } from "../ai/generation/AiGenerateModal";
 import { LibraryPanel } from "../components/LibraryPanel";
-import { CropEditorModal } from "../image-tools/crop/CropEditorModal";
-import { MaskEditorModal } from "../image-tools/mask/MaskEditorModal";
+import { AppearanceSettings } from "../components/AppearanceSettings";
 import { QuickToolbarSettings } from "../components/QuickToolbarSettings";
+import { ImageEditorModal } from "../image-tools/ImageEditorModal";
 import { useEditorStore } from "../editor/store";
+import { replaceImageWithFitFrame } from "../lib/aiImageLayout";
 import { useAppModals } from "./hooks/useAppModals";
 import { useProjectImportExport } from "./hooks/useProjectImportExport";
 
@@ -17,7 +18,7 @@ type EditorModalsProps = {
 
 export function EditorModals(props: EditorModalsProps) {
   const { modals, project } = props;
-  const replaceImageKeepFrame = useEditorStore((s) => s.replaceImageKeepFrame);
+  const replaceImageFitFrame = useEditorStore((s) => s.replaceImageFitFrame);
 
   return (
     <>
@@ -48,8 +49,11 @@ export function EditorModals(props: EditorModalsProps) {
           }
           const reader = new FileReader();
           reader.onload = () => {
-            replaceImageKeepFrame(id, String(reader.result));
-            modals.setReplaceImageTargetId(null);
+            void replaceImageWithFitFrame(
+              replaceImageFitFrame,
+              id,
+              String(reader.result),
+            ).finally(() => modals.setReplaceImageTargetId(null));
           };
           reader.onerror = () => modals.setReplaceImageTargetId(null);
           reader.readAsDataURL(file);
@@ -64,6 +68,10 @@ export function EditorModals(props: EditorModalsProps) {
         open={modals.quickToolbarSettingsOpen}
         onClose={() => modals.setQuickToolbarSettingsOpen(false)}
       />
+      <AppearanceSettings
+        open={modals.appearanceSettingsOpen}
+        onClose={() => modals.setAppearanceSettingsOpen(false)}
+      />
 
       <AiGenerateModal
         open={modals.aiOpen}
@@ -73,15 +81,17 @@ export function EditorModals(props: EditorModalsProps) {
           modals.setAiOutputMode("new-layer");
         }}
       />
-      <MaskEditorModal
-        open={!!modals.maskEditorImageId}
-        imageId={modals.maskEditorImageId}
-        onClose={() => modals.setMaskEditorImageId(null)}
-      />
-      <CropEditorModal
-        open={!!modals.cropEditorImageId}
-        imageId={modals.cropEditorImageId}
-        onClose={() => modals.setCropEditorImageId(null)}
+
+      <ImageEditorModal
+        open={!!modals.imageEditor}
+        imageId={modals.imageEditor?.imageId ?? null}
+        tool={modals.imageEditor?.tool ?? "crop"}
+        onToolChange={(tool) =>
+          modals.setImageEditor((prev) =>
+            prev ? { ...prev, tool } : null,
+          )
+        }
+        onClose={modals.closeImageEditor}
       />
     </>
   );

@@ -63,6 +63,14 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
       const wfIds = get().selectedWorkflowNodeIds;
       const elIds = get().selectedIds;
       if (!wfIds.length && !elIds.length) return;
+
+      const page = get().getActivePage();
+      const removableElCount = elIds.filter((id) => {
+        const el = page.elements.find((e) => e.id === id);
+        return el && !el.locked;
+      }).length;
+      if (!wfIds.length && !removableElCount) return;
+
       get().commitHistory();
 
       set(
@@ -70,9 +78,14 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           const page = state.pages.find((p) => p.id === state.activePageId);
           if (!page) return;
 
-          const removedEls = new Set(state.selectedIds);
-          if (removedEls.size > 0) {
-            page.elements = page.elements.filter((el) => !removedEls.has(el.id));
+          const removableEls = new Set(
+            state.selectedIds.filter((id) => {
+              const el = page!.elements.find((e) => e.id === id);
+              return el && !el.locked;
+            }),
+          );
+          if (removableEls.size > 0) {
+            page.elements = page.elements.filter((el) => !removableEls.has(el.id));
           }
 
           const removedWf = new Set(state.selectedWorkflowNodeIds);
@@ -83,7 +96,7 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           page.edges = page.edges.filter((e) => {
             if (
               e.from.kind === "image-element" &&
-              removedEls.has(e.from.elementId)
+              removableEls.has(e.from.elementId)
             ) {
               return false;
             }
@@ -96,7 +109,7 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
             return true;
           });
 
-          state.selectedIds = [];
+          state.selectedIds = state.selectedIds.filter((id) => !removableEls.has(id));
           state.selectedWorkflowNodeIds = [];
         }),
       );
@@ -112,6 +125,50 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           if (!el || el.type !== "image") return;
 
           el.src = src;
+          el.cropOffsetX = 0;
+          el.cropOffsetY = 0;
+          el.cropScale = 1;
+          el.cropRotation = 0;
+          el.flipX = false;
+          el.flipY = false;
+          el.aiMask = null;
+        }),
+      );
+    },
+
+    /** 按原图比例重算外框（不换 src，用于修复旧 520×320 图层） */
+    fitImageFrame: (id: string, size: { width: number; height: number }) => {
+      get().commitHistory();
+
+      set(
+        produce<Store>((state) => {
+          const page = state.pages.find((p) => p.id === state.activePageId);
+          const el = page?.elements.find((item) => item.id === id);
+          if (!el || el.type !== "image") return;
+
+          el.width = Math.max(5, Math.round(size.width));
+          el.height = Math.max(5, Math.round(size.height));
+          el.cropOffsetX = 0;
+          el.cropOffsetY = 0;
+          el.cropScale = 1;
+          el.cropRotation = 0;
+        }),
+      );
+    },
+
+    /** 换图并按原图比例重算外框（拖入替换、导入长图/竖图时使用） */
+    replaceImageFitFrame: (id: string, src: string, size: { width: number; height: number }) => {
+      get().commitHistory();
+
+      set(
+        produce<Store>((state) => {
+          const page = state.pages.find((p) => p.id === state.activePageId);
+          const el = page?.elements.find((item) => item.id === id);
+          if (!el || el.type !== "image") return;
+
+          el.src = src;
+          el.width = Math.max(5, Math.round(size.width));
+          el.height = Math.max(5, Math.round(size.height));
           el.cropOffsetX = 0;
           el.cropOffsetY = 0;
           el.cropScale = 1;

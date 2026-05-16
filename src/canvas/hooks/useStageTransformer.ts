@@ -35,7 +35,12 @@ export function useStageTransformer({
       return;
     }
 
+    const page = state.getActivePage();
     const nodes = state.selectedIds
+      .filter((id) => {
+        const el = page.elements.find((e) => e.id === id);
+        return el && el.visible && !el.locked;
+      })
       .map((id) => stage.findOne(`#${id}`))
       .filter(Boolean) as Konva.Node[];
 
@@ -57,8 +62,8 @@ export function useStageTransformer({
         requestAnimationFrame(() => {
           const tr2 = transformerRef.current;
           if (!tr2) return;
-          const rot = tr2.findOne(function (this: Konva.Node) {
-            const n = this.name();
+          const rot = tr2.findOne((node: Konva.Node) => {
+            const n = node.name();
             return typeof n === "string" && n.startsWith("rotater");
           });
           if (rot) styleRotaterAnchor(rot, tr2);

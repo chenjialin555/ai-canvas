@@ -22,7 +22,7 @@ export function MarqueeSelection({ visible, box }: MarqueeSelectionProps) {
       width={box.width}
       height={box.height}
       fill="rgba(66,196,196,0.14)"
-      stroke="#42c4c4"
+      stroke="#2f7cff"
       strokeWidth={1}
       listening={false}
     />

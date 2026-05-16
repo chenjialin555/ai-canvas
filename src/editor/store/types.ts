@@ -80,6 +80,7 @@ export type Store = EditorState & {
   setTool: (tool: ToolType) => void;
 
   setEditingTextId: (id: string | null) => void;
+  centerViewOnElement: (elementId: string) => void;
 
   setQuickToolbarConfig: (
     scope: QuickToolbarScopeKey,
@@ -89,6 +90,12 @@ export type Store = EditorState & {
   setFloatingToolbarSuppressed: (v: boolean) => void;
 
   replaceImageKeepFrame: (id: string, src: string) => void;
+  fitImageFrame: (id: string, size: { width: number; height: number }) => void;
+  replaceImageFitFrame: (
+    id: string,
+    src: string,
+    size: { width: number; height: number },
+  ) => void;
 
   setImageAIMask: (id: string, mask: ImageMaskData | null) => void;
   clearImageAIMask: (id: string) => void;
@@ -97,6 +104,8 @@ export type Store = EditorState & {
   sendBackward: (id: string) => void;
   bringToFront: (id: string) => void;
   sendToBack: (id: string) => void;
+  /** 根图层顺序：数组从底到顶（与 Konva 绘制顺序一致） */
+  reorderRootsByStackOrder: (rootIdsBottomToTop: string[]) => void;
 
   addPage: () => void;
   duplicatePage: (id: string) => void;

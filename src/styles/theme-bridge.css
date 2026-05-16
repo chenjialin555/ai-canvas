@@ -1,0 +1,313 @@
+/**
+ * 主题桥接：把 themes.css 变量应用到现有 class，并补充各主题差异样式。
+ */
+
+body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+.figma-app {
+  background: transparent;
+  color: var(--text);
+}
+
+.figma-topbar {
+  background: var(--top) !important;
+  border-bottom-color: var(--border) !important;
+  backdrop-filter: blur(18px);
+}
+
+.brand strong {
+  color: var(--text) !important;
+}
+
+.toolbar button:hover {
+  background: color-mix(in srgb, var(--panel-3) 80%, transparent) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.left-panel,
+.right-panel,
+.right-panel--chat {
+  background: var(--panel) !important;
+  border-color: var(--border) !important;
+  backdrop-filter: blur(18px);
+}
+
+.project-head {
+  background: linear-gradient(180deg, var(--panel-3), var(--panel)) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+
+.outline-head,
+.right-tabs,
+.ai-chat-toolbar,
+.ai-chat-toolbar--second,
+.ai-chat-attach-strip {
+  background: var(--panel-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+
+.search,
+.field input,
+.field select,
+.field textarea,
+.ai-chat-select,
+.ai-chat-input {
+  background: var(--panel-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+.layer-row:hover {
+  background: var(--panel-3) !important;
+}
+
+.layer-row.selected {
+  background: rgba(59, 130, 246, 0.22) !important;
+  color: var(--text) !important;
+  border-left-color: var(--brand) !important;
+}
+
+.canvas-area,
+.konva-wrap {
+  background-color: var(--canvas) !important;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) !important;
+  background-size: 24px 24px !important;
+}
+
+.tabs {
+  background: var(--panel) !important;
+  border-color: var(--border) !important;
+}
+
+.right-tabs button.active,
+.right-panel--chat .right-tabs button.active {
+  background: var(--panel-3) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.ai-chat-messages {
+  background: var(--bg) !important;
+}
+
+.ai-chat-msg-inner--bot {
+  background: var(--panel-3) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+.context-menu,
+.floating-toolbar,
+.minimap,
+.library-panel,
+.quick-settings,
+.appearance-settings {
+  background: var(--panel) !important;
+  border-color: var(--border) !important;
+  color: var(--text);
+}
+
+.modal-mask {
+  background: color-mix(in srgb, var(--bg) 55%, transparent) !important;
+}
+
+.ai-modal,
+.modal-mask .modal,
+.image-editor {
+  background: var(--panel) !important;
+  color: var(--text);
+}
+
+.image-editor-head {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2)) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+.image-editor-body {
+  background: var(--bg) !important;
+}
+
+.image-editor-subbar {
+  background: var(--panel) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+.image-editor-tabs button.active {
+  color: var(--brand) !important;
+  border-bottom-color: var(--brand) !important;
+}
+
+.image-editor .mask-panel,
+.image-editor .mask-tools,
+.image-editor .mask-status {
+  background: var(--panel) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+.image-editor .mask-canvas-wrap {
+  background: var(--canvas) !important;
+}
+
+.panel h3,
+.inspect-head,
+.library-head strong {
+  color: var(--text) !important;
+}
+
+.empty,
+.outline-empty,
+.ai-chat-toolbar-muted {
+  color: var(--text-3) !important;
+}
+
+/* ---- ComfyUI ---- */
+body.theme-comfy .toolbar button.active {
+  color: #111827 !important;
+  background: linear-gradient(180deg, #ffae54, #f0883e) !important;
+  border-color: rgba(255, 159, 67, 0.5) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 159, 67, 0.18),
+    0 8px 22px rgba(255, 159, 67, 0.25) !important;
+}
+
+body.theme-comfy .project-head {
+  background: linear-gradient(180deg, #262f3c, #1b222c) !important;
+  color: #fff !important;
+}
+
+body.theme-comfy .tabs button.active,
+body.theme-comfy .right-tabs button.active {
+  color: #111827 !important;
+  background: var(--accent) !important;
+  border-color: #ffb45f !important;
+  font-weight: 700;
+}
+
+body.theme-comfy .canvas-area,
+body.theme-comfy .konva-wrap {
+  background-image:
+    radial-gradient(circle at 50% 30%, rgba(255, 159, 67, 0.04), transparent 32%),
+    linear-gradient(rgba(132, 152, 178, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 152, 178, 0.08) 1px, transparent 1px) !important;
+  background-size: 100% 100%, 22px 22px, 22px 22px !important;
+}
+
+body.theme-comfy .primary,
+body.theme-comfy .ai-chat-send,
+body.theme-comfy .template-btn {
+  color: #111827 !important;
+  background: linear-gradient(180deg, #ffae54, #f0883e) !important;
+}
+
+/* ---- VSCode ---- */
+body.theme-vscode .toolbar button.active {
+  background: #0e639c !important;
+  border-color: #3794ff !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+body.theme-vscode .project-head {
+  background: #333333 !important;
+}
+
+body.theme-vscode .layer-row.selected,
+body.theme-vscode .right-tabs button.active {
+  background: #37373d !important;
+  color: #ffffff !important;
+  outline: 1px solid #007acc;
+}
+
+body.theme-vscode .primary,
+body.theme-vscode .ai-chat-send,
+body.theme-vscode .template-btn {
+  background: #0e639c !important;
+  box-shadow: none !important;
+}
+
+body.theme-vscode .ai-chat-msg-inner {
+  background: #0e639c !important;
+  box-shadow: none !important;
+}
+
+/* ---- Cursor Dark ---- */
+body.theme-cursor-dark .canvas-area,
+body.theme-cursor-dark .konva-wrap {
+  background-image:
+    radial-gradient(circle at 50% 25%, rgba(139, 92, 246, 0.08), transparent 40%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) !important;
+  background-size: 100% 100%, 24px 24px, 24px 24px !important;
+}
+
+/* ---- Cursor Light ---- */
+body.theme-cursor-light .toolbar button:hover {
+  background: #f0f7ff !important;
+  color: var(--brand) !important;
+}
+
+body.theme-cursor-light .layer-row.selected {
+  background: color-mix(in srgb, var(--brand) 12%, white) !important;
+}
+
+/* ---- 设置面板：主题选择 ---- */
+.appearance-settings {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.appearance-settings__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.appearance-theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.appearance-theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-2);
+  color: var(--text);
+  text-align: left;
+  transition: 0.15s ease;
+}
+
+.appearance-theme-card:hover {
+  border-color: var(--border-2);
+  background: var(--panel-3);
+}
+
+.appearance-theme-card.active {
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  background: color-mix(in srgb, var(--brand) 12%, var(--panel-2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+
+.appearance-theme-card__label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.appearance-theme-card__desc {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.45;
+}

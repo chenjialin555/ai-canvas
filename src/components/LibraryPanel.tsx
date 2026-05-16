@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { getImageDefaults, useEditorStore } from "../editor/store";
 import type { CanvasElement } from "../editor/types";
+import { loadImageFrameSize } from "../lib/aiImageLayout";
 
 const assets = [
   {
@@ -31,15 +32,16 @@ export function LibraryPanel(props: Props) {
 
   if (!props.open) return null;
 
-  function addAsset(src: string, name: string) {
+  async function addAsset(src: string, name: string) {
+    const frame = await loadImageFrameSize(src);
     addElement({
       id: nanoid(),
       type: "image",
       name,
       x: 420,
       y: 320,
-      width: 520,
-      height: 320,
+      width: frame.width,
+      height: frame.height,
       rotation: 0,
       opacity: 1,
       visible: true,
