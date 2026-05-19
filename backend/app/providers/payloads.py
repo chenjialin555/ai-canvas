@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.app.schemas.generation import GenerateImageRequest
+from backend.app.modules.generation.schemas import GenerateImageRequest
 from backend.app.utils.image import calculate_doubao_size_from_image
 
 

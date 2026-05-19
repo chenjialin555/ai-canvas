@@ -49,3 +49,38 @@ export function exportImageMaskToDataURL(image: ImageElement): string | null {
   if (!image.aiMask) return null;
   return exportMaskToDataURL(image.aiMask);
 }
+
+/** 将帧坐标系蒙版缩放到与渲染导出图相同的像素尺寸 */
+export async function exportImageMaskToDataURLAtSize(
+  image: ImageElement,
+  pixelWidth: number,
+  pixelHeight: number,
+): Promise<string | null> {
+  if (!image.aiMask?.strokes.length) return null;
+  const mask = image.aiMask;
+  if (
+    Math.round(mask.width) === Math.round(pixelWidth) &&
+    Math.round(mask.height) === Math.round(pixelHeight)
+  ) {
+    return exportMaskToDataURL(mask);
+  }
+
+  const src = exportMaskToDataURL(mask);
+  if (!src) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(pixelWidth));
+  canvas.height = Math.max(1, Math.round(pixelHeight));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const tmp = new Image();
+  return new Promise<string | null>((resolve) => {
+    tmp.onload = () => {
+      ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    tmp.onerror = () => resolve(src);
+    tmp.src = src;
+  });
+}

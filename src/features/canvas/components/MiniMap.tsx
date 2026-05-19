@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { useEditorStore } from "../editor/store";
+import { useEditorStore } from "../../editor/store";
 
 const STAGE_W_PAD = 260 + 294;
 const STAGE_H_PAD = 48 + 34;

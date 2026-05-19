@@ -10,9 +10,12 @@ import {
 } from "react-konva";
 import Konva from "konva";
 import type { SceneContext } from "konva/lib/Context";
-import type { Filter } from "konva/lib/Node";
 import { useCanvasImage } from "../../canvas/elements/useCanvasImage";
 import { clone, useEditorStore } from "../../editor/store";
+import {
+  getKonvaImageFilterProps,
+  normalizeImageFilter,
+} from "../../editor/image-filter/imageFilter";
 import type {
   CanvasElement,
   ImageElement,
@@ -70,20 +73,15 @@ function CropModalFilteredImage(props: {
 }) {
   const imageRef = useRef<Konva.Image | null>(null);
   const { element: element } = props;
-  const filter = element.filter;
-
-  const filters: Filter[] = [];
-
-  if (filter.brightness !== 0) filters.push(Konva.Filters.Brighten);
-  if (filter.contrast !== 0) filters.push(Konva.Filters.Contrast);
-  if (filter.saturation !== 0) filters.push(Konva.Filters.HSV);
-  if (filter.blur !== 0) filters.push(Konva.Filters.Blur);
-
-  const hasFilters = filters.length > 0;
+  const filter = useMemo(
+    () => normalizeImageFilter(element.filter),
+    [element.filter],
+  );
+  const konva = useMemo(() => getKonvaImageFilterProps(filter), [filter]);
 
   useEffect(() => {
     const node = imageRef.current;
-    if (!node || !hasFilters) return;
+    if (!node || !konva.hasFilters) return;
 
     try {
       node.cache();
@@ -98,11 +96,13 @@ function CropModalFilteredImage(props: {
     };
   }, [
     props.image,
-    hasFilters,
-    filter.brightness,
-    filter.contrast,
-    filter.saturation,
-    filter.blur,
+    konva.hasFilters,
+    konva.brightness,
+    konva.contrast,
+    konva.saturation,
+    konva.hue,
+    konva.blurRadius,
+    konva.noise,
     element.cropScale,
     element.cropRotation,
     element.flipX,
@@ -131,11 +131,13 @@ function CropModalFilteredImage(props: {
       scaleY={finalScale * (element.flipY ? -1 : 1)}
       rotation={element.cropRotation || 0}
       draggable
-      filters={hasFilters ? filters : undefined}
-      brightness={hasFilters ? filter.brightness : undefined}
-      contrast={hasFilters ? filter.contrast : undefined}
-      saturation={hasFilters ? filter.saturation : undefined}
-      blurRadius={hasFilters ? filter.blur : undefined}
+      filters={konva.hasFilters ? konva.filters : undefined}
+      brightness={konva.brightness}
+      contrast={konva.contrast}
+      saturation={konva.saturation}
+      hue={konva.hue}
+      blurRadius={konva.blurRadius}
+      noise={konva.noise}
       onDragMove={(e) => {
         props.onPatch(
           cropOffsetFromImageCenter(
@@ -264,7 +266,7 @@ export function CropEditorPanel({ imageId, active, onClose }: Props) {
     if (el) setDraft(clone(el));
   }, [active, imageId, sourceEl]);
 
-  const imgLoaded = useCanvasImage(sourceEl?.src);
+  const { image: imgLoaded } = useCanvasImage(sourceEl?.src);
 
   const draftRef = useRef<ImageElement | null>(null);
   useEffect(() => {

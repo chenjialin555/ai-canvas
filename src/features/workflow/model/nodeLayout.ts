@@ -1,16 +1,25 @@
 /**
  * AI 节点布局规范（世界坐标，与 WorkflowNodeView、unifiedGraph 必须一致）
  */
-export const AI_NODE_MIN_WIDTH = 280;
-export const AI_NODE_MIN_HEIGHT = 220;
-export const AI_NODE_MAX_HEIGHT = 360;
+import type { WorkflowNodeDefinition } from "./types";
 
-/** 标题栏高度（含与端口区的分隔） */
-export const AI_NODE_HEADER_H = 40;
-/** 第一行端口圆心的 Y（相对节点顶部；与标题栏留出空隙） */
-export const AI_NODE_PORT_ROW_START = 58;
+export const AI_NODE_MIN_WIDTH = 340;
+export const AI_NODE_MIN_HEIGHT = 280;
+export const AI_NODE_MAX_HEIGHT = 420;
+
+/** 顶栏彩色条高度（现代卡片模板） */
+export const AI_NODE_TOP_BAR_H = 5;
+
+/** 标题区高度（含顶栏下内边距） */
+export const AI_NODE_HEADER_H = 48;
+
+export const AI_NODE_BODY_PAD_X = 18;
+export const AI_NODE_BODY_PAD_BOTTOM = 18;
+
+/** 第一行端口圆心的 Y（相对节点顶部） */
+export const AI_NODE_PORT_ROW_START = 64;
 /** 端口行距（圆心到圆心） */
-export const AI_NODE_PORT_GAP = 28;
+export const AI_NODE_PORT_GAP = 30;
 
 /** @deprecated 与 AI_NODE_PORT_ROW_START 同义 */
 export const AI_NODE_PORT_TOP = AI_NODE_PORT_ROW_START;
@@ -18,14 +27,41 @@ export const AI_NODE_PORT_TOP = AI_NODE_PORT_ROW_START;
 export const AI_NODE_PORT_STEP = AI_NODE_PORT_GAP;
 
 /** 输入端口圆心距左边缘 */
-export const AI_NODE_INPUT_PORT_CX = 10;
+export const AI_NODE_INPUT_PORT_CX = 12;
 /** 输出端口圆心距右边缘 */
-export const AI_NODE_OUTPUT_PORT_CX = 10;
+export const AI_NODE_OUTPUT_PORT_CX = 12;
 
-/** 预览区最大高度（节点内缩略图区域） */
-export const AI_NODE_PREVIEW_MAX_H = 120;
-/** 预览区左边距（与 WorkflowNodeView 内边距一致） */
-export const AI_NODE_PREVIEW_X = 12;
+/** 预览区最大高度 */
+export const AI_NODE_PREVIEW_MAX_H = 112;
+export const AI_NODE_PREVIEW_X = 18;
+
+/** 节点说明区块（section 标题 + 描述框） */
+export const AI_NODE_DESC_SECTION_H = 78;
+/** 输出预览区块（section 标题 + 预览框） */
+export const AI_NODE_PREVIEW_SECTION_H = AI_NODE_PREVIEW_MAX_H + 26;
+/** 底栏双按钮区 */
+export const AI_NODE_ACTIONS_H = 44;
+export const AI_NODE_ACTIONS_GAP = 10;
+
+/** 根据节点定义计算推荐高度（非紧凑模式） */
+export function computeWorkflowNodeHeight(
+  def: WorkflowNodeDefinition,
+  compact = false,
+): number {
+  if (compact) {
+    return Math.max(AI_NODE_MIN_HEIGHT, AI_NODE_HEADER_H + 56);
+  }
+
+  const portRows = Math.max(def.inputs.length, def.outputs.length, 1);
+  const portBottom = AI_NODE_PORT_ROW_START + portRows * AI_NODE_PORT_GAP;
+  const descBlock = def.description?.trim() ? AI_NODE_DESC_SECTION_H : 0;
+  const previewBlock = def.preview?.enabled ? AI_NODE_PREVIEW_SECTION_H : 0;
+  const footer = AI_NODE_ACTIONS_H + AI_NODE_BODY_PAD_BOTTOM + 8;
+
+  let h = portBottom + descBlock + previewBlock + footer;
+  h = Math.max(AI_NODE_MIN_HEIGHT, Math.min(AI_NODE_MAX_HEIGHT, h));
+  return h;
+}
 
 /** 图片节点右侧端口：image 约 42% 高，mask 约 58% 高 */
 export function imageOutputPortOffset(

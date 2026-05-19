@@ -1,4 +1,4 @@
-import { useEditorStore } from "../editor/store";
+import { useEditorStore } from "@/features/editor";
 
 export function PageTabs() {
   const {

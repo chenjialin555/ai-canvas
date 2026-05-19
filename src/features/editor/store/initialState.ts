@@ -1,10 +1,10 @@
 import {
   DEFAULT_QUICK_TOOLBAR_CONFIG,
   mergeQuickToolbarConfig,
-} from "../quickTools";
+} from "../quick-tools/quickTools";
 import type { EditorState, Page } from "../types";
 import { STORAGE_KEY } from "./constants";
-import { migratePage, makeDefaultPage } from "./helpers/pageMigration";
+import { makeBlankProjectPages, migratePage } from "./helpers/pageMigration";
 
 export function getInitial(): EditorState {
   try {
@@ -50,10 +50,11 @@ export function getInitial(): EditorState {
     /* ignore */
   }
 
-  const page = makeDefaultPage();
+  const pages = makeBlankProjectPages();
+  const page = pages[0]!;
 
   return {
-    pages: [page],
+    pages,
     activePageId: page.id,
     selectedIds: [],
     zoom: 0.45,

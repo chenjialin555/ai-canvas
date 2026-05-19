@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { useEditorStore } from "../../editor/store";
-import { generateImageFromModal } from "./generationService";
-import { MODEL_CHOICES, PROVIDERS, type ImageProvider } from "./generationTypes";
+import { useEditorStore } from "../../../features/editor/store";
+import {
+  generateImageFromModal,
+  type GenerateImagePhase,
+} from "../services/generationService";
+import {
+  GENERATION_ASPECT_RATIOS,
+  GENERATION_RATIO_AUTO,
+  pickClosestGenerationRatio,
+} from "../model/generationRatio";
+import { MODEL_CHOICES, PROVIDERS, type ImageProvider } from "../model/generationTypes";
 
-export type { ImageProvider } from "./generationTypes";
+export type { ImageProvider } from "../model/generationTypes";
 export { MODEL_CHOICES, PROVIDERS };
 
 type Props = {
@@ -30,6 +38,7 @@ export function AiGenerateModal(props: Props) {
   const [seed, setSeed] = useState("");
   const [guidanceScale, setGuidanceScale] = useState("");
   const [watermark, setWatermark] = useState(false);
+  const [genPhase, setGenPhase] = useState<GenerateImagePhase | null>(null);
 
   const { addElement, selectedIds, getActivePage, replaceImageKeepFrame } =
     useEditorStore();
@@ -38,6 +47,13 @@ export function AiGenerateModal(props: Props) {
     const pg = st.pages.find((p) => p.id === st.activePageId);
     return pg?.elements.find((el) => el.id === st.selectedIds[0]);
   });
+
+  const autoMatchedRatio = useMemo(() => {
+    if (ratio !== GENERATION_RATIO_AUTO || selected?.type !== "image") {
+      return null;
+    }
+    return pickClosestGenerationRatio(selected.width, selected.height);
+  }, [ratio, selected]);
 
   const modeHint = useMemo(() => {
     if (selected?.type === "image" && selected.aiMask) {
@@ -48,6 +64,23 @@ export function AiGenerateModal(props: Props) {
     }
     return "模式：文生图";
   }, [selected]);
+
+  const phaseHint = useMemo(() => {
+    switch (genPhase) {
+      case "render":
+        return "正在合成画布图片（裁剪/调色）…";
+      case "upload":
+        return "正在上传图片与蒙版到 OSS…";
+      case "request":
+        return "正在提交生成请求…";
+      case "model":
+        return "模型推理中，通常需要 20～60 秒…";
+      case "done":
+        return "准备完成，即将请求模型…";
+      default:
+        return null;
+    }
+  }, [genPhase]);
 
   const layerResultHint = useMemo(() => {
     const outMode = props.outputMode ?? "new-layer";
@@ -72,6 +105,7 @@ export function AiGenerateModal(props: Props) {
   async function generate() {
     setGenError(null);
     setLoading(true);
+    setGenPhase(null);
     try {
       const page = getActivePage();
       const result = await generateImageFromModal({
@@ -92,10 +126,12 @@ export function AiGenerateModal(props: Props) {
         onSuccessClose: props.onClose,
         addElement,
         replaceImageKeepFrame,
+        onPhase: setGenPhase,
       });
       if (!result.ok) setGenError(result.message);
     } finally {
       setLoading(false);
+      setGenPhase(null);
     }
   }
 
@@ -117,7 +153,16 @@ export function AiGenerateModal(props: Props) {
         {loading && (
           <div className="ai-modal-loading-overlay" role="status" aria-live="polite">
             <div className="ai-gen-spinner" aria-hidden />
-            <p className="ai-gen-status-title">正在生成图片…</p>
+            <p className="ai-gen-status-title">
+              {genPhase === "model" || genPhase === "request"
+                ? "正在生成图片…"
+                : "正在准备…"}
+            </p>
+            {phaseHint && (
+              <p className="ai-gen-status-detail" style={{ fontWeight: 500 }}>
+                {phaseHint}
+              </p>
+            )}
             <p className="ai-gen-status-detail">
               {providerLabel}
               <br />
@@ -130,7 +175,7 @@ export function AiGenerateModal(props: Props) {
               {layerResultHint}
             </p>
             <p className="ai-gen-status-hint">
-              已向后端发送请求，模型推理可能需要数十秒，请稍候。关闭控制台也不影响此处状态。
+              若长时间停在「准备」阶段，多为大图合成或上传；停在「模型推理」则为网关生成，属正常现象。
             </p>
             <div className="ai-gen-dots" aria-hidden>
               <span />
@@ -186,15 +231,25 @@ export function AiGenerateModal(props: Props) {
                 value={ratio}
                 onChange={(e) => setRatio(e.target.value)}
               >
-                <option value="1x1">1x1</option>
-                <option value="2x3">2x3</option>
-                <option value="3x2">3x2</option>
-                <option value="4x5">4x5</option>
-                <option value="5x4">5x4</option>
-                <option value="16x9">16x9</option>
-                <option value="9x16">9x16</option>
-                <option value="21x9">21x9</option>
+                <option value={GENERATION_RATIO_AUTO}>AUTO（跟随参考图）</option>
+                {GENERATION_ASPECT_RATIOS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
               </select>
+              {autoMatchedRatio && (
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    fontSize: 11,
+                    color: "#64748b",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  当前参考图外框将匹配为最接近的 <strong>{autoMatchedRatio}</strong>
+                </p>
+              )}
             </div>
             <div className="ai-row" style={{ marginBottom: 0 }}>
               <label htmlFor="ai-resolution">分辨率</label>

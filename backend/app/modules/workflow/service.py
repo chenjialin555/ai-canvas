@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from backend.app.executors.registry import executor_registry
-from backend.app.schemas.workflow import RunNodeRequest, RunNodeResponse
+from backend.app.modules.workflow.schemas import RunNodeRequest, RunNodeResponse
 
 log = logging.getLogger("ai_canvas.workflow")
 

@@ -12,17 +12,19 @@
  */
 import { useMemo, useRef } from "react";
 import Konva from "konva";
-import { ContextMenu } from "../components/ContextMenu";
-import { exportCroppedImageAsPNG } from "../editor/export";
-import { executeElementCommand } from "../editor/commands/executeElementCommand";
-import { useEditorStore } from "../editor/store";
-import { AppShell } from "./AppShell";
-import { CanvasArea } from "./CanvasArea";
-import { EditorModals } from "./EditorModals";
-import { LeftSidebar } from "./LeftSidebar";
-import { RightSidebar } from "./RightSidebar";
-import { TopBar } from "./TopBar";
-import { loadImageFrameSize } from "../lib/aiImageLayout";
+import { ContextMenu } from "../shared/ui/ContextMenu";
+import {
+  executeElementCommand,
+  exportCroppedImageAsPNG,
+  useEditorStore,
+} from "@/features/editor";
+import { AppShell } from "./shell/AppShell";
+import { CanvasArea } from "./shell/CanvasArea";
+import { EditorModals } from "./shell/EditorModals";
+import { LeftSidebar } from "./shell/LeftSidebar";
+import { RightSidebar } from "./shell/RightSidebar";
+import { TopBar } from "./shell/TopBar";
+import { loadImageFrameSize } from "../shared/lib/aiImageLayout";
 import { useAppModals } from "./hooks/useAppModals";
 import { useProjectImportExport } from "./hooks/useProjectImportExport";
 import { useStageExport } from "./hooks/useStageExport";
@@ -100,6 +102,7 @@ export default function App() {
           }
           onOpenSettings={() => modals.setAppearanceSettingsOpen(true)}
           onPickJson={() => project.jsonInputRef.current?.click()}
+          jsonWorkflowBusy={project.jsonWorkflowBusy}
           exportStage={exportStage}
         />
       }

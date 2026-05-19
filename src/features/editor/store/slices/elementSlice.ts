@@ -1,7 +1,35 @@
 import { produce } from "immer";
+import {
+  needsPersistImageSrc,
+  persistImageSrcToOss,
+} from "../../images/persistImageSrc";
+import {
+  normalizeImageFilter,
+  type ImageFilter,
+} from "../../image-filter/imageFilter";
 import type { CanvasElement, ImageMaskData } from "../../types";
 import type { Store } from "../types";
 import type { StoreGet, StoreSet } from "../sliceTypes";
+
+function scheduleImageSrcPersist(
+  get: StoreGet,
+  elementId: string,
+  expectedSrc: string,
+) {
+  if (!needsPersistImageSrc(expectedSrc)) return;
+
+  void persistImageSrcToOss(expectedSrc, { apiName: "canvas-image" })
+    .then((url) => {
+      const page = get().pages.find((p) => p.id === get().activePageId);
+      const el = page?.elements.find((item) => item.id === elementId);
+      if (el?.type === "image" && el.src === expectedSrc) {
+        get().updateElement(elementId, { src: url }, { history: false });
+      }
+    })
+    .catch((err) => {
+      console.warn("[persistImageSrc] upload failed:", err);
+    });
+}
 
 export function createElementSlice(set: StoreSet, get: StoreGet) {
   return {
@@ -41,7 +69,32 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
             return;
           }
 
-          Object.assign(el, patch);
+          if (
+            el.type === "image" &&
+            (patch as Partial<{ filter?: ImageFilter }>).filter
+          ) {
+            const nextFilter = (patch as { filter: ImageFilter }).filter;
+            el.filter = {
+              ...normalizeImageFilter(el.filter),
+              ...nextFilter,
+            };
+            const rest = { ...patch } as Record<string, unknown>;
+            delete rest.filter;
+            Object.assign(el, rest);
+          } else {
+            Object.assign(el, patch);
+          }
+
+          if (
+            el.type === "image" &&
+            typeof (patch as Partial<{ src?: string }>).src === "string"
+          ) {
+            scheduleImageSrcPersist(
+              get,
+              id,
+              (patch as { src: string }).src,
+            );
+          }
         }),
       );
     },
@@ -57,6 +110,10 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           state.selectedIds = [element.id];
         }),
       );
+
+      if (element.type === "image") {
+        scheduleImageSrcPersist(get, element.id, element.src);
+      }
     },
 
     removeSelected: () => {
@@ -134,6 +191,8 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           el.aiMask = null;
         }),
       );
+
+      scheduleImageSrcPersist(get, id, src);
     },
 
     /** 按原图比例重算外框（不换 src，用于修复旧 520×320 图层） */
@@ -178,6 +237,8 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           el.aiMask = null;
         }),
       );
+
+      scheduleImageSrcPersist(get, id, src);
     },
 
     setImageAIMask: (id: string, mask: ImageMaskData | null) => {

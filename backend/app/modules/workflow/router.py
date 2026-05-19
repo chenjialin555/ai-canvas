@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.app.schemas.workflow import RunNodeRequest, RunNodeResponse
-from backend.app.services.workflow_service import workflow_service
+from backend.app.modules.workflow.schemas import RunNodeRequest, RunNodeResponse
+from backend.app.modules.workflow.service import workflow_service
 
 log = logging.getLogger("ai_canvas.api")
 

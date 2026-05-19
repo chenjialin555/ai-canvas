@@ -1,4 +1,4 @@
-import type { NodeEndpoint } from "../../../workflow/types";
+import type { NodeEndpoint } from "../model/types";
 
 export function endpointKey(e: NodeEndpoint): string {
   if (e.kind === "image-element") {

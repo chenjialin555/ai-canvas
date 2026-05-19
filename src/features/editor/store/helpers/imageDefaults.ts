@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
-import { computeImageFrameSize } from "../../../lib/aiImageLayout";
+import { computeImageFrameSize } from "../../../../shared/lib/aiImageLayout";
+import { DEFAULT_IMAGE_FILTER } from "../../image-filter/imageFilter";
 import type { ImageElement } from "../../types";
 
 const DEFAULT_IMAGE_FRAME = computeImageFrameSize(16, 9);
@@ -35,12 +36,7 @@ export function getImageDefaults(): Pick<
     flipY: false,
     cornerRadius: 0,
     maskShape: "rect",
-    filter: {
-      brightness: 0,
-      contrast: 0,
-      saturation: 0,
-      blur: 0,
-    },
+    filter: { ...DEFAULT_IMAGE_FILTER },
     aiMask: null,
   };
 }

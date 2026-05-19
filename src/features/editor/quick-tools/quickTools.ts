@@ -7,9 +7,9 @@ export type QuickToolbarElementType =
 
 export type QuickToolId =
   | "crop"
+  | "adjust"
   | "mask"
   | "parse3d"
-  | "ai-edit"
   | "generate-node"
   | "connect"
   | "replace-image"
@@ -40,6 +40,12 @@ export const QUICK_TOOL_LIBRARY: QuickTool[] = [
     elementTypes: ["image"],
   },
   {
+    id: "adjust",
+    label: "调整",
+    icon: "☼",
+    elementTypes: ["image"],
+  },
+  {
     id: "mask",
     label: "蒙版",
     icon: "◐",
@@ -49,12 +55,6 @@ export const QUICK_TOOL_LIBRARY: QuickTool[] = [
     id: "parse3d",
     label: "解析3D",
     icon: "3D",
-    elementTypes: ["image"],
-  },
-  {
-    id: "ai-edit",
-    label: "AI 编辑",
-    icon: "✦",
     elementTypes: ["image"],
   },
   {
@@ -137,9 +137,9 @@ export const DEFAULT_QUICK_TOOLBAR_CONFIG: Record<
 > = {
   image: [
     "crop",
+    "adjust",
     "mask",
     "parse3d",
-    "ai-edit",
     "generate-node",
     "connect",
     "replace-image",
@@ -163,7 +163,9 @@ export function normalizeQuickToolbarIds(
   if (!Array.isArray(ids)) return [...DEFAULT_QUICK_TOOLBAR_CONFIG[scope]];
   const out: QuickToolId[] = [];
   for (const x of ids) {
-    if (typeof x !== "string" || !ALL_IDS.has(x as QuickToolId)) continue;
+    if (typeof x !== "string" || x === "ai-edit" || !ALL_IDS.has(x as QuickToolId)) {
+      continue;
+    }
     const id = x as QuickToolId;
     const tool = getToolById(id);
     if (!tool) continue;
@@ -173,7 +175,13 @@ export function normalizeQuickToolbarIds(
     }
     if (tool.elementTypes.includes(scope as QuickToolbarElementType)) out.push(id);
   }
-  return out.length ? out : [...DEFAULT_QUICK_TOOLBAR_CONFIG[scope]];
+  const resolved = out.length ? out : [...DEFAULT_QUICK_TOOLBAR_CONFIG[scope]];
+  if (scope === "image" && !resolved.includes("adjust")) {
+    const cropIdx = resolved.indexOf("crop");
+    if (cropIdx >= 0) resolved.splice(cropIdx + 1, 0, "adjust");
+    else resolved.unshift("adjust");
+  }
+  return resolved;
 }
 
 export function mergeQuickToolbarConfig(

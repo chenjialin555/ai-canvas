@@ -1,5 +1,5 @@
-import { apiPostJson } from "../../api/aiClient";
-import { normalizeAiError } from "../../errors/normalizeAiError";
+import { apiPostJson } from "../../../shared/api/aiClient";
+import { normalizeAiError } from "../../ai-generation/errors/normalizeAiError";
 
 export type WorkflowRunNodePayload = {
   nodeType: string;

@@ -1,4 +1,4 @@
-import { setApiBaseUrl } from "../ai/api/client";
+import { setApiBaseUrl } from "../api/client";
 import { createDesktopPlatformAdapter } from "./desktop";
 import type { PlatformAdapter, PlatformId } from "./types";
 import { createWebPlatformAdapter } from "./web";

@@ -1,9 +1,7 @@
 import type Konva from "konva";
 import type { RefObject } from "react";
-import type { CanvasContextMenuOpenPayload } from "../canvas/hooks/useCanvasContextMenu";
-import { FloatingToolbar } from "../components/FloatingToolbar";
-import { MiniMap } from "../components/MiniMap";
-import { StageCanvas } from "../components/StageCanvas";
+import type { CanvasContextMenuOpenPayload } from "@/features/canvas/hooks/useCanvasContextMenu";
+import { FloatingToolbar, MiniMap, StageCanvas } from "@/features/canvas";
 import { PageTabs } from "./PageTabs";
 
 type CanvasAreaProps = {

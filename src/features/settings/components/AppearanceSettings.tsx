@@ -4,7 +4,8 @@ import {
   getStoredUiTheme,
   UI_THEME_OPTIONS,
   type UiThemeId,
-} from "../lib/uiTheme";
+  type UiThemeOption,
+} from "../../../shared/lib/uiTheme";
 
 type Props = {
   open: boolean;
@@ -42,7 +43,7 @@ export function AppearanceSettings(props: Props) {
         <div className="quick-settings-body">
           <p className="appearance-settings__hint">界面主题</p>
           <div className="appearance-theme-grid">
-            {UI_THEME_OPTIONS.map((theme) => (
+            {UI_THEME_OPTIONS.map((theme: UiThemeOption) => (
               <button
                 key={theme.id}
                 type="button"

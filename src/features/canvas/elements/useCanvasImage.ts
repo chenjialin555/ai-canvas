@@ -10,22 +10,44 @@ const SRC_FALLBACK: Record<string, string> = {
   "/assets/ui-shot-02.jpg": fallback.ui2,
 };
 
-export function useCanvasImage(src?: string) {
+export type CanvasImageLoadPhase = "idle" | "loading" | "loaded" | "error";
+
+export function isRemoteImageSrc(src: string): boolean {
+  return /^https?:\/\//i.test(src.trim());
+}
+
+export type UseCanvasImageResult = {
+  image: HTMLImageElement | null;
+  /** 远程 URL 图片尚未解码完成 */
+  loading: boolean;
+  phase: CanvasImageLoadPhase;
+};
+
+export function useCanvasImage(src?: string): UseCanvasImageResult {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [phase, setPhase] = useState<CanvasImageLoadPhase>("idle");
 
   useEffect(() => {
     if (!src) {
       setImage(null);
+      setPhase("idle");
       return;
     }
 
     let cancelled = false;
+    const remote = isRemoteImageSrc(src);
+
+    setImage(null);
+    setPhase(remote ? "loading" : "loading");
 
     const load = (url: string) => {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
-        if (!cancelled) setImage(img);
+        if (!cancelled) {
+          setImage(img);
+          setPhase("loaded");
+        }
       };
       img.onerror = () => {
         const fb = SRC_FALLBACK[src];
@@ -33,7 +55,10 @@ export function useCanvasImage(src?: string) {
           load(fb);
           return;
         }
-        if (!cancelled) setImage(null);
+        if (!cancelled) {
+          setImage(null);
+          setPhase("error");
+        }
       };
       img.src = url;
     };
@@ -44,5 +69,7 @@ export function useCanvasImage(src?: string) {
     };
   }, [src]);
 
-  return image;
+  const loading = !!src && isRemoteImageSrc(src) && phase === "loading";
+
+  return { image, loading, phase };
 }

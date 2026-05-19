@@ -12,7 +12,7 @@ import { createViewportSlice } from "./slices/viewportSlice";
 import { createUiSlice } from "./slices/uiSlice";
 import { createPageSlice } from "./slices/pageSlice";
 import { createProjectSlice } from "./slices/projectSlice";
-import { createWorkflowSlice } from "./slices/workflowSlice";
+import { createWorkflowSlice } from "../../workflow/store/workflowSlice";
 import { setupAutoPersist } from "./persistence/setupAutoPersist";
 
 export const useEditorStore = create<Store>()((set, get) => ({

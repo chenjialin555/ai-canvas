@@ -3,10 +3,10 @@ import Konva from "konva";
 import {
   computeMaxImageExportPixelRatio,
   downloadDataURL,
-} from "../../editor/export";
-import { useEditorStore } from "../../editor/store";
-import type { ImageElement } from "../../editor/types";
-import { randomImageFilename } from "../../lib/randomFilename";
+  useEditorStore,
+} from "@/features/editor";
+import type { ImageElement } from "@/features/editor/types";
+import { randomImageFilename } from "../../shared/lib/randomFilename";
 
 export function useStageExport(
   stageRef: RefObject<Konva.Stage | null>,

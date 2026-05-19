@@ -5,8 +5,9 @@ from typing import Any
 
 from backend.app.core.settings import Settings
 from backend.app.providers.registry import provider_registry
-from backend.app.schemas.generation import GenerateImageRequest, GenerateImageResponse
-from backend.app.services.upload_service import UploadService
+from backend.app.modules.generation.schemas import GenerateImageRequest, GenerateImageResponse
+from backend.app.modules.upload.service import UploadService
+from backend.app.utils.image import calculate_ratio_from_image
 from backend.app.utils.log_sanitize import sanitize_for_log, sanitize_generate_request
 
 log = logging.getLogger("ai_canvas.generate")
@@ -84,6 +85,17 @@ class GenerationService:
         }
         return new_req, uploaded
 
+    def resolve_request_ratio(self, req: GenerateImageRequest) -> GenerateImageRequest:
+        """`ratio=auto` 时按参考图宽高匹配最接近的预设比例。"""
+        ratio = (req.ratio or "").strip().lower()
+        if ratio != "auto":
+            return req
+        if req.image:
+            resolved = calculate_ratio_from_image(req.image)
+            log.info("ratio auto resolved from image traceId=%s ratio=%s", req.traceId, resolved)
+            return req.model_copy(update={"ratio": resolved})
+        return req.model_copy(update={"ratio": "16x9"})
+
     def run_generate_image(
         self,
         req: GenerateImageRequest,
@@ -96,6 +108,7 @@ class GenerationService:
         )
         try:
             normalized_req, uploaded = self.normalize_request_images(req)
+            normalized_req = self.resolve_request_ratio(normalized_req)
             provider_impl = provider_registry.get(req.provider)
             url, raw, final_model = provider_impl.generate(normalized_req, self._settings)
         except Exception as e:
@@ -128,3 +141,9 @@ class GenerationService:
             raw=raw_out,
             uploaded=uploaded,
         )
+
+
+from backend.app.core.settings import settings
+from backend.app.modules.upload.service import upload_service
+
+generation_service = GenerationService(settings, upload_service)

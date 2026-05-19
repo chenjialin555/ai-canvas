@@ -1,20 +1,20 @@
 import { produce } from "immer";
 import { nanoid } from "nanoid";
-import type { Store } from "../types";
-import type { StoreGet, StoreSet } from "../sliceTypes";
-import { endpointKey } from "../helpers/workflowEndpoint";
-import { getWorkflowNodeDefinition } from "../../../workflow/nodeRegistry";
-import { createWorkflowNode } from "../../../workflow/utils/createNode";
-import { serializeWorkflowInputsForApi } from "../../../workflow/utils/runPayload";
-import type { NodeEdge, NodeEndpoint, WorkflowNode } from "../../../workflow/types";
-import { executeWorkflowNodeRemoteRun } from "../../../ai/workflow/services/workflowRunner";
-import { sendWorkflowImageResultToCanvas } from "../../../ai/workflow/services/workflowResultToCanvas";
+import type { Store } from "../../../features/editor/store/types";
+import type { StoreGet, StoreSet } from "../../../features/editor/store/sliceTypes";
+import { endpointKey } from "../utils/workflowEndpoint";
+import { getWorkflowNodeDefinition } from "../model/nodeRegistry";
+import { createWorkflowNode } from "../utils/createNode";
+import { serializeWorkflowInputsForApi } from "../utils/runPayload";
+import type { NodeEdge, NodeEndpoint, WorkflowNode } from "../model/types";
+import { executeWorkflowNodeRemoteRun } from "../services/workflowRunner";
+import { sendWorkflowImageResultToCanvas } from "../services/workflowResultToCanvas";
 import {
   clampAiNodeDimensions,
   findFirstCompatibleInputPort,
   getOutgoingDataType,
   resolveAiNodeInputs,
-} from "../../../workflow/utils/unifiedGraph";
+} from "../utils/unifiedGraph";
 
 export function createWorkflowSlice(set: StoreSet, get: StoreGet) {
   return {
@@ -349,7 +349,7 @@ export function createWorkflowSlice(set: StoreSet, get: StoreGet) {
 
       let inputsSerialized: Record<string, unknown>;
       try {
-        inputsSerialized = serializeWorkflowInputsForApi(nodeId, page);
+        inputsSerialized = await serializeWorkflowInputsForApi(nodeId, page);
       } catch (e) {
         get().updateWorkflowNode(
           nodeId,

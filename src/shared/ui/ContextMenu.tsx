@@ -1,5 +1,5 @@
-import type { CanvasElement } from "../editor/types";
-import type { WorkflowNode } from "../workflow/types";
+import type { CanvasElement } from "../../features/editor/types";
+import type { WorkflowNode } from "../../features/workflow/model/types";
 
 export type ContextMenuTargetKind = "empty" | "element" | "workflow-node";
 

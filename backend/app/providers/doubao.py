@@ -5,7 +5,7 @@ from typing import Any
 from backend.app.core.settings import Settings
 from backend.app.providers.payloads import build_doubao_payload
 from backend.app.providers.response_parse import extract_image_url_from_images_response
-from backend.app.schemas.generation import GenerateImageRequest
+from backend.app.modules.generation.schemas import GenerateImageRequest
 from backend.app.utils.http import post_json_with_retry
 
 IMAGES_ENDPOINT = "/v1/images/generations"

@@ -1,8 +1,8 @@
 import { memo } from "react";
 import { Layer, Line } from "react-konva";
 import { useEditorStore } from "../../editor/store";
-import { PORT_COLORS } from "../../workflow/portColors";
-import { edgeBezierPointsUnified } from "../../workflow/utils/unifiedGraph";
+import { PORT_COLORS } from "../../../features/workflow/model/portColors";
+import { edgeBezierPointsUnified } from "../../../features/workflow/utils/unifiedGraph";
 
 const GRID_STEP = 24;
 const GRID_W = 5000;
@@ -47,9 +47,14 @@ export const CanvasBackgroundLayer = memo(function CanvasBackgroundLayer() {
   );
   if (!page) return null;
 
+  const isBlankCanvas =
+    page.elements.length === 0 &&
+    page.aiNodes.length === 0 &&
+    page.edges.length === 0;
+
   return (
     <Layer listening={false}>
-      <StaticGrid />
+      {!isBlankCanvas && <StaticGrid />}
       {page.edges.map((edge) => {
         const pts = edgeBezierPointsUnified(page, edge);
         const dt = edge.dataType;

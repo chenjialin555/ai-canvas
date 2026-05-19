@@ -5,8 +5,8 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { useEditorStore } from "../../editor/store";
-import { listCreatableWorkflowNodes } from "../../workflow/nodeRegistry";
+import { useEditorStore } from "../../../features/editor/store";
+import { listCreatableWorkflowNodes } from "../model/nodeRegistry";
 
 type Props = {
   screenX: number;

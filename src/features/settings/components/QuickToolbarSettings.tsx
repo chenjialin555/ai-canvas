@@ -3,8 +3,8 @@ import {
   QUICK_TOOL_LIBRARY,
   type QuickToolId,
   type QuickToolbarScopeKey,
-} from "../editor/quickTools";
-import { useEditorStore } from "../editor/store";
+} from "../../editor/quick-tools/quickTools";
+import { useEditorStore } from "../../editor/store";
 
 const SCOPE_LABEL: Record<QuickToolbarScopeKey, string> = {
   image: "图片",

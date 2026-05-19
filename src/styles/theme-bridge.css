@@ -109,7 +109,8 @@ body {
 .minimap,
 .library-panel,
 .quick-settings,
-.appearance-settings {
+.appearance-settings,
+.image-adjust-panel {
   background: var(--panel) !important;
   border-color: var(--border) !important;
   color: var(--text);

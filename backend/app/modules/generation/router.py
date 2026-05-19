@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.app.schemas.generation import GenerateImageRequest, GenerateImageResponse
-from backend.app.services import generation_service
+from backend.app.modules.generation.schemas import GenerateImageRequest, GenerateImageResponse
+from backend.app.modules.generation.service import generation_service
 
 log = logging.getLogger("ai_canvas.api")
 

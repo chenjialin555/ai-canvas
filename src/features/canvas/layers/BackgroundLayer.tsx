@@ -1,7 +1,7 @@
 import { Layer, Line, Rect } from "react-konva";
 import type { Page } from "../../editor/types";
-import { PORT_COLORS } from "../../workflow/portColors";
-import { edgeBezierPointsUnified } from "../../workflow/utils/unifiedGraph";
+import { PORT_COLORS } from "../../../features/workflow/model/portColors";
+import { edgeBezierPointsUnified } from "../../../features/workflow/utils/unifiedGraph";
 
 function Grid(props: { width: number; height: number }) {
   const lines = [];

@@ -1,4 +1,4 @@
-import { formatApiDetail } from "../../lib/apiFormat";
+import { formatApiDetail } from "../../../shared/lib/apiFormat";
 
 export type AiErrorInput =
   | string

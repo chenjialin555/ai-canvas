@@ -1,12 +1,11 @@
-import { AiGenerateModal } from "../ai/generation/AiGenerateModal";
-import { LibraryPanel } from "../components/LibraryPanel";
-import { AppearanceSettings } from "../components/AppearanceSettings";
-import { QuickToolbarSettings } from "../components/QuickToolbarSettings";
-import { ImageEditorModal } from "../image-tools/ImageEditorModal";
-import { useEditorStore } from "../editor/store";
-import { replaceImageWithFitFrame } from "../lib/aiImageLayout";
-import { useAppModals } from "./hooks/useAppModals";
-import { useProjectImportExport } from "./hooks/useProjectImportExport";
+import { AiGenerateModal } from "@/features/ai-generation";
+import { ImageEditorModal } from "@/features/image-tools";
+import { LibraryPanel } from "@/features/library";
+import { AppearanceSettings, QuickToolbarSettings } from "@/features/settings";
+import { useEditorStore } from "@/features/editor";
+import { replaceImageWithFitFrame } from "../../shared/lib/aiImageLayout";
+import { useAppModals } from "../hooks/useAppModals";
+import { useProjectImportExport } from "../hooks/useProjectImportExport";
 
 type ModalsState = ReturnType<typeof useAppModals>;
 type ProjectIO = ReturnType<typeof useProjectImportExport>;

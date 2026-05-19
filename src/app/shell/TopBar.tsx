@@ -1,8 +1,7 @@
 import { nanoid } from "nanoid";
-import { downloadJSON } from "../editor/export";
-import { getImageDefaults, useEditorStore } from "../editor/store";
-import type { CanvasElement } from "../editor/types";
-import { loadImageFrameSize } from "../lib/aiImageLayout";
+import { downloadJSON, getImageDefaults, useEditorStore } from "@/features/editor";
+import type { CanvasElement } from "@/features/editor/types";
+import { loadImageFrameSize } from "../../shared/lib/aiImageLayout";
 
 type TopBarProps = {
   onOpenLibrary: () => void;
@@ -10,6 +9,7 @@ type TopBarProps = {
   onOpenQuickToolbarSettings: () => void;
   onOpenSettings: () => void;
   onPickJson: () => void;
+  jsonWorkflowBusy?: boolean;
   exportStage: (type: "png" | "jpg") => void;
 };
 
@@ -169,12 +169,28 @@ export function TopBar(props: TopBarProps) {
       <div className="top-actions">
         <button
           type="button"
-          onClick={() => downloadJSON(store.exportProjectJSON())}
+          disabled={props.jsonWorkflowBusy}
+          onClick={async () => {
+            try {
+              const json = await store.exportProjectJSON();
+              downloadJSON(json, "ai-canvas-workflow.json");
+            } catch (e) {
+              alert(
+                e instanceof Error
+                  ? `导出 json 工作流失败：${e.message}`
+                  : "导出 json 工作流失败",
+              );
+            }
+          }}
         >
-          保存JSON
+          导出json工作流
         </button>
-        <button type="button" onClick={props.onPickJson}>
-          加载JSON
+        <button
+          type="button"
+          disabled={props.jsonWorkflowBusy}
+          onClick={props.onPickJson}
+        >
+          {props.jsonWorkflowBusy ? "导入中…" : "导入json工作流"}
         </button>
         <button type="button" onClick={() => props.exportStage("png")}>
           导出PNG

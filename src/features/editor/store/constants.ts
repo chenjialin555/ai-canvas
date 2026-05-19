@@ -1,4 +1,5 @@
-export const STORAGE_KEY = "AI_CANVAS_PRO_PROJECT_V2";
+/** V3：默认空白画布（无示例图/工作流节点）；与 V2 不兼容，首次升级会重新初始化 */
+export const STORAGE_KEY = "AI_CANVAS_PRO_PROJECT_V3";
 
 export const LOCAL_STORAGE_PERSIST_DEBOUNCE_MS = 600;
 

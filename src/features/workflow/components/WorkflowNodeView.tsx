@@ -1,36 +1,63 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from "react-konva";
+import { Circle, Group, Image as KonvaImage, Rect, Text } from "react-konva";
 import type Konva from "konva";
-import { useEditorStore } from "../../editor/store";
+import { useEditorStore } from "../../../features/editor/store";
 import {
   gestureHistoryDragEnd,
   gestureHistoryDragStart,
-} from "../../editor/commands/interactionGestureHistory";
-import { getWorkflowNodeDefinition } from "../../workflow/nodeRegistry";
+} from "../../../features/editor/commands/interactionGestureHistory";
+import { buildComfyBridgeDefinition } from "../comfy/buildComfyBridgeDefinition";
+import { getWorkflowNodeDefinition } from "../model/nodeRegistry";
 import {
+  AI_NODE_ACTIONS_GAP,
+  AI_NODE_ACTIONS_H,
+  AI_NODE_BODY_PAD_BOTTOM,
+  AI_NODE_BODY_PAD_X,
+  AI_NODE_DESC_SECTION_H,
   AI_NODE_HEADER_H,
-  AI_NODE_MAX_HEIGHT,
+  AI_NODE_INPUT_PORT_CX,
   AI_NODE_MIN_HEIGHT,
   AI_NODE_MIN_WIDTH,
+  AI_NODE_OUTPUT_PORT_CX,
   AI_NODE_PORT_GAP,
   AI_NODE_PORT_ROW_START,
   AI_NODE_PREVIEW_MAX_H,
-  aiInputPortCenterLocal,
-  aiOutputPortCenterLocal,
-} from "../../workflow/nodeLayout";
-import { useWorkflowNodeTheme } from "../../hooks/useWorkflowNodeTheme";
-import { extFromImageUrl, randomImageFilename } from "../../lib/randomFilename";
-import { PORT_COLORS } from "../../workflow/portColors";
-import type { WorkflowNode, WorkflowNodeDefinition } from "../../workflow/types";
+  AI_NODE_TOP_BAR_H,
+  computeWorkflowNodeHeight,
+} from "../model/nodeLayout";
+import { useWorkflowNodeTheme } from "../../../shared/hooks/useWorkflowNodeTheme";
+import { extFromImageUrl, randomImageFilename } from "../../../shared/lib/randomFilename";
+import { PORT_COLORS } from "../model/portColors";
+import type { WorkflowNode } from "../model/types";
 
 type Props = {
   nodeId: string;
 };
 
-const PORT_RADIUS = 6;
+const PORT_RADIUS = 6.5;
 const PORT_GLOW = 4;
 const CARD_STROKE = 1;
 
+/** 与卡片圆角一致的裁剪路径，顶栏渐变条等子元素不再单独设过大 cornerRadius */
+function clipWorkflowNodeCard(
+  ctx: Konva.Context,
+  w: number,
+  h: number,
+  r: number,
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(radius, 0);
+  ctx.lineTo(w - radius, 0);
+  ctx.arcTo(w, 0, w, radius, radius);
+  ctx.lineTo(w, h - radius);
+  ctx.arcTo(w, h, w - radius, h, radius);
+  ctx.lineTo(radius, h);
+  ctx.arcTo(0, h, 0, h - radius, radius);
+  ctx.lineTo(0, radius);
+  ctx.arcTo(0, 0, radius, 0, radius);
+  ctx.closePath();
+}
 /** 仅画布缩得很小时再隐藏节点正文（预览/参数等）；默认 zoom=0.45，若用 0.45 作阈值会「略缩小就整块空白」 */
 const COMPACT_BODY_ZOOM_THRESHOLD = 0.2;
 
@@ -53,33 +80,6 @@ function useHtmlImage(url?: string) {
     i.src = url;
   }, [url]);
   return img;
-}
-
-function formatParamSnippets(
-  def: WorkflowNodeDefinition,
-  params: Record<string, unknown>,
-): string[] {
-  const lines: string[] = [];
-  for (const p of def.params.slice(0, 2)) {
-    const raw = params[p.id];
-    let val = "—";
-    if (raw !== undefined && raw !== null) {
-      if (p.type === "boolean") val = raw ? "是" : "否";
-      else if (typeof raw === "string")
-        val = raw.length > 30 ? `${raw.slice(0, 28)}…` : raw;
-      else if (typeof raw === "number") val = String(raw);
-      else {
-        try {
-          const s = JSON.stringify(raw);
-          val = s.length > 32 ? `${s.slice(0, 30)}…` : s;
-        } catch {
-          val = "…";
-        }
-      }
-    }
-    lines.push(`${p.label}: ${val}`);
-  }
-  return lines;
 }
 
 function statusText(status: WorkflowNode["status"]): string {
@@ -184,10 +184,11 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
   });
   const zoom = useEditorStore((s) => s.zoom);
 
-  const def = useMemo(
-    () => (node ? getWorkflowNodeDefinition(node.type) : null),
-    [node?.type],
-  );
+  const def = useMemo(() => {
+    if (!node) return null;
+    if (node.type === "comfy-bridge") return buildComfyBridgeDefinition(node);
+    return getWorkflowNodeDefinition(node.type);
+  }, [node?.type, node?.params]);
   const selected = useEditorStore((s) =>
     node ? s.selectedWorkflowNodeIds.includes(node.id) : false,
   );
@@ -201,15 +202,15 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
   const runNode = useEditorStore((s) => s.runWorkflowNode);
   const sendCanvas = useEditorStore((s) => s.sendWorkflowResultToCanvas);
 
+  const compactEarly = zoom < COMPACT_BODY_ZOOM_THRESHOLD;
+
   const nw = node
     ? Math.max(AI_NODE_MIN_WIDTH, safeDim(node.width, AI_NODE_MIN_WIDTH))
     : AI_NODE_MIN_WIDTH;
-  const nh = node
-    ? Math.min(
-        AI_NODE_MAX_HEIGHT,
-        Math.max(AI_NODE_MIN_HEIGHT, safeDim(node.height, AI_NODE_MIN_HEIGHT)),
-      )
-    : AI_NODE_MIN_HEIGHT;
+  const nh = useMemo(() => {
+    if (!def) return AI_NODE_MIN_HEIGHT;
+    return computeWorkflowNodeHeight(def, compactEarly);
+  }, [def, compactEarly]);
 
   useLayoutEffect(() => {
     if (!node) return;
@@ -229,51 +230,32 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
       : undefined;
   const previewImg = useHtmlImage(previewUrl);
 
-  const paramLines = useMemo(
-    () => (def && node ? formatParamSnippets(def, node.params) : []),
-    [def, node?.params],
-  );
-
   if (!node || !def) return null;
 
-  const compact = zoom < COMPACT_BODY_ZOOM_THRESHOLD;
+  const compact = compactEarly;
   const zLay = Math.max(0.45, Math.min(zoom, 4));
   const fs = (screenPx: number) =>
     Math.max(10, Math.min(24, screenPx / zLay));
 
-  const portRows = Math.max(def.inputs.length, def.outputs.length);
+  const padX = AI_NODE_BODY_PAD_X;
+  const portRows = Math.max(def.inputs.length, def.outputs.length, 1);
   const portBlockBottom = AI_NODE_PORT_ROW_START + portRows * AI_NODE_PORT_GAP;
+  const hasDesc = !compact && Boolean(def.description?.trim());
+  const descSectionY = portBlockBottom + 6;
+  const previewSectionY = hasDesc
+    ? descSectionY + AI_NODE_DESC_SECTION_H
+    : descSectionY;
+  const hasPreview = !compact && Boolean(def.preview?.enabled);
+  const previewH = hasPreview ? AI_NODE_PREVIEW_MAX_H : 0;
+  const previewY = previewSectionY + 18;
+  const actionsY = nh - AI_NODE_BODY_PAD_BOTTOM - AI_NODE_ACTIONS_H;
+  const btnW = (nw - padX * 2 - AI_NODE_ACTIONS_GAP) / 2;
+  const descText = (def.description || "").trim();
 
-  const summaryBlockH =
-    !compact && def.params.length > 0 ? 36 : !compact ? 10 : 0;
-  const summaryTop = portBlockBottom + 4;
-  const previewCaptionY = summaryTop + summaryBlockH;
-
-  const footerH = compact ? 44 : 52;
-  const runBarH = compact ? 30 : 34;
-  const runBarY = nh - footerH + (footerH - runBarH) / 2;
-
-  const previewW = Math.max(40, nw - 24);
-  const previewH =
-    compact || !def.preview?.enabled
-      ? 0
-      : Math.min(
-          AI_NODE_PREVIEW_MAX_H,
-          Math.max(
-            64,
-            nh - previewCaptionY - 18 - footerH - (node.outputs.result ? 22 : 0),
-          ),
-        );
-
-  let previewY = previewCaptionY + 16;
-  if (!compact && def.preview?.enabled && previewH > 0) {
-    if (previewY + previewH > nh - footerH - 8) {
-      previewY = Math.max(previewCaptionY + 8, nh - footerH - previewH - 8);
-    }
-  }
+  const previewW = Math.max(40, nw - padX * 2);
 
   const previewBox = useMemo(() => {
-    const bx = 12;
+    const bx = padX;
     const by = previewY;
     const bw = previewW;
     const bh = previewH;
@@ -319,27 +301,29 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
     );
   }, [previewImg, previewOut, previewBox]);
 
-  const titleFont = compact ? 14 : 16;
-  const labelFont = compact ? 11 : 12;
-  const resultLinkY =
-    !compact && node.outputs.result?.type === "image"
-      ? runBarY - fs(13) - 8
-      : 0;
+  const titleFont = compact ? 15 : 17;
+  const labelFont = compact ? 11 : 13;
+  const sectionFont = 12;
+  const descFont = 13;
 
   const statusPill = theme.statusPill(node.status);
   const statusLabel = statusText(node.status);
-  const statusPillW = Math.min(72, 28 + statusLabel.length * 11);
+  const statusPillW = Math.min(88, 24 + statusLabel.length * 12);
   const cardRadius = theme.cardRadius;
   const previewRadius = theme.previewRadius;
-  const topBarStops =
+  const descRadius = theme.descRadius;
+  const [barC1, barC2, barC3] =
     node.status === "running"
-      ? ([0, theme.barRunning[0], 1, theme.barRunning[1]] as const)
+      ? ([theme.barRunning[0], theme.barRunning[1], theme.barRunning[1]] as const)
       : selected
-        ? ([0, theme.barSelected[0], 1, theme.barSelected[1]] as const)
-        : ([0, theme.barIdle[0], 1, theme.barIdle[1]] as const);
+        ? theme.accentBar
+        : theme.accentBar;
 
   const showRunBar = def.executor !== "none" || Boolean(def.showRunBar);
-  const runBtnW = nw - 28;
+  const resultLinkY =
+    !compact && node.outputs.result?.type === "image"
+      ? actionsY - fs(13) - 6
+      : 0;
 
   const runPrimaryLabel =
     def.type === "output-view"
@@ -394,67 +378,36 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         listening={false}
       />
 
-      <Rect
-        width={nw}
-        height={nh}
-        fill={theme.bg}
-        cornerRadius={cardRadius}
-        stroke={selected ? theme.borderSelected : theme.border}
-        strokeWidth={selected ? 1.5 : CARD_STROKE}
-        opacity={selected ? 1 : 0.98}
-      />
-
-      {/* 顶栏渐变条 */}
-      <Rect
-        x={0}
-        y={0}
-        width={nw}
-        height={3}
-        cornerRadius={[cardRadius, cardRadius, 0, 0]}
-        fillLinearGradientStartPoint={{ x: 0, y: 0 }}
-        fillLinearGradientEndPoint={{ x: nw, y: 0 }}
-        fillLinearGradientColorStops={[...topBarStops]}
-        listening={false}
-      />
-
-      <Rect
-        x={0}
-        y={3}
-        width={nw}
-        height={AI_NODE_HEADER_H - 3}
-        fillLinearGradientStartPoint={{ x: 0, y: 0 }}
-        fillLinearGradientEndPoint={{ x: 0, y: AI_NODE_HEADER_H }}
-        fillLinearGradientColorStops={[0, theme.headerFrom, 1, theme.headerTo]}
-        listening={false}
-      />
-
-      {node.status === "running" && (
+      <Group
+        clipFunc={(ctx) => clipWorkflowNodeCard(ctx, nw, nh, cardRadius)}
+      >
         <Rect
-          x={12}
-          y={AI_NODE_HEADER_H - 4}
-          width={(nw - 24) * 0.42}
-          height={3}
-          fill={theme.barRunning[1]}
-          cornerRadius={2}
-          listening={false}
-          opacity={0.85}
+          width={nw}
+          height={nh}
+          fill={theme.bg}
+          cornerRadius={cardRadius}
+          stroke={selected ? theme.borderSelected : theme.border}
+          strokeWidth={selected ? 1.5 : CARD_STROKE}
+          opacity={selected ? 1 : 0.98}
         />
-      )}
 
-      <Line
-        points={[0, AI_NODE_HEADER_H, nw, AI_NODE_HEADER_H]}
-        stroke={theme.divider}
-        strokeWidth={1}
-        listening={false}
-      />
+        {/* 顶栏三色渐变条（由父级圆角裁剪贴合卡片顶边） */}
+        <Rect
+          x={0}
+          y={0}
+          width={nw}
+          height={AI_NODE_TOP_BAR_H}
+          fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+          fillLinearGradientEndPoint={{ x: nw, y: 0 }}
+          fillLinearGradientColorStops={[0, barC1, 0.5, barC2, 1, barC3]}
+          listening={false}
+        />
 
       <Text
         text={node.title}
-        x={12}
-        y={10}
-        width={nw - 96}
-        height={AI_NODE_HEADER_H - 12}
-        verticalAlign="middle"
+        x={padX}
+        y={AI_NODE_TOP_BAR_H + 12}
+        width={nw - statusPillW - padX * 2 - 12}
         fontSize={titleFont}
         fill={theme.title}
         fontStyle="bold"
@@ -462,156 +415,165 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         wrap="none"
       />
 
-      <Group x={nw - statusPillW - 10} y={AI_NODE_HEADER_H / 2 - 10}>
+      <Group x={nw - statusPillW - padX} y={AI_NODE_TOP_BAR_H + 10}>
         <Rect
           width={statusPillW}
-          height={20}
+          height={24}
           fill={statusPill.bg}
-          cornerRadius={10}
+          cornerRadius={12}
           stroke={statusPill.stroke}
           strokeWidth={1}
           listening={false}
         />
-        <Circle
-          x={10}
-          y={10}
-          radius={3.5}
-          fill={statusPill.dot}
-          listening={false}
-        />
         <Text
           text={statusLabel}
-          x={18}
-          y={5}
-          width={statusPillW - 22}
-          fontSize={10}
+          x={0}
+          y={6}
+          width={statusPillW}
+          align="center"
+          fontSize={12}
           fontStyle="bold"
           fill={statusPill.fg}
           listening={false}
         />
       </Group>
 
-      {def.inputs.map((inp, idx) => {
-        const { x: cx, y: cy } = aiInputPortCenterLocal(idx);
-        const col = PORT_COLORS[inp.dataType];
+      {Array.from({ length: portRows }, (_, idx) => {
+        const rowY = AI_NODE_PORT_ROW_START + idx * AI_NODE_PORT_GAP;
+        const inp = def.inputs[idx];
+        const out = def.outputs[idx];
         return (
-          <Group key={inp.id}>
-            <PortCircle
-              x={cx}
-              y={cy}
-              color={col}
-              stroke={theme.portStroke}
-              onMouseDown={(e) => {
-                e.cancelBubble = true;
-                if (
-                  connectingActive &&
-                  connectingDataType === inp.dataType
-                ) {
-                  completeConn({
-                    kind: "ai-node",
-                    nodeId: node.id,
-                    portId: inp.id,
-                  });
-                }
-              }}
-              onMouseUp={(e) => {
-                if (
-                  connectingActive &&
-                  connectingDataType === inp.dataType
-                ) {
-                  e.cancelBubble = true;
-                  completeConn({
-                    kind: "ai-node",
-                    nodeId: node.id,
-                    portId: inp.id,
-                  });
-                }
-              }}
-            />
-            {!compact && (
-              <Text
-                text={inp.label}
-                x={cx + PORT_RADIUS + 10}
-                y={cy - labelFont * 0.45}
-                fontSize={labelFont}
-                fill={theme.muted}
-              />
+          <Group key={`port-row-${idx}`}>
+            {inp && (
+              <>
+                <PortCircle
+                  x={AI_NODE_INPUT_PORT_CX}
+                  y={rowY}
+                  color={PORT_COLORS[inp.dataType]}
+                  stroke={theme.portStroke}
+                  onMouseDown={(e) => {
+                    e.cancelBubble = true;
+                    if (
+                      connectingActive &&
+                      connectingDataType === inp.dataType
+                    ) {
+                      completeConn({
+                        kind: "ai-node",
+                        nodeId: node.id,
+                        portId: inp.id,
+                      });
+                    }
+                  }}
+                  onMouseUp={(e) => {
+                    if (
+                      connectingActive &&
+                      connectingDataType === inp.dataType
+                    ) {
+                      e.cancelBubble = true;
+                      completeConn({
+                        kind: "ai-node",
+                        nodeId: node.id,
+                        portId: inp.id,
+                      });
+                    }
+                  }}
+                />
+                {!compact && (
+                  <Text
+                    text={inp.label}
+                    x={AI_NODE_INPUT_PORT_CX + PORT_RADIUS + 8}
+                    y={rowY - labelFont * 0.45}
+                    fontSize={labelFont}
+                    fill={theme.portLabel}
+                  />
+                )}
+              </>
+            )}
+            {out && (
+              <>
+                {!compact && (
+                  <Text
+                    text={out.label}
+                    x={padX}
+                    y={rowY - labelFont * 0.45}
+                    width={nw - padX * 2 - 80}
+                    align="right"
+                    fontSize={labelFont}
+                    fill={theme.portLabel}
+                  />
+                )}
+                <PortCircle
+                  x={nw - AI_NODE_OUTPUT_PORT_CX}
+                  y={rowY}
+                  color={PORT_COLORS[out.dataType]}
+                  stroke={theme.portStroke}
+                  onMouseDown={(e) => {
+                    e.cancelBubble = true;
+                    const stage = e.target.getStage();
+                    if (!stage) return;
+                    const pos = stage.getRelativePointerPosition();
+                    if (!pos) return;
+                    startConn(
+                      { kind: "ai-node", nodeId: node.id, portId: out.id },
+                      pos.x,
+                      pos.y,
+                    );
+                  }}
+                />
+              </>
             )}
           </Group>
         );
       })}
 
-      {def.outputs.map((out, idx) => {
-        const { x: cx, y: cy } = aiOutputPortCenterLocal(idx, nw);
-        const col = PORT_COLORS[out.dataType];
-        return (
-          <Group key={out.id}>
-            {!compact && (
-              <Text
-                text={out.label}
-                x={cx - 76}
-                y={cy - labelFont * 0.45}
-                width={68}
-                align="right"
-                fontSize={labelFont}
-                fill={theme.muted}
-              />
-            )}
-            <PortCircle
-              x={cx}
-              y={cy}
-              color={col}
-              stroke={theme.portStroke}
-              onMouseDown={(e) => {
-                e.cancelBubble = true;
-                const stage = e.target.getStage();
-                if (!stage) return;
-                const pos = stage.getRelativePointerPosition();
-                if (!pos) return;
-                startConn(
-                  { kind: "ai-node", nodeId: node.id, portId: out.id },
-                  pos.x,
-                  pos.y,
-                );
-              }}
-            />
-          </Group>
-        );
-      })}
-
-      {!compact &&
-        paramLines.map((line, i) => (
+      {hasDesc && (
+        <>
           <Text
-            key={i}
-            text={line}
-            x={14}
-            y={summaryTop + i * 15}
-            width={nw - 28}
-            fontSize={11}
-            fill={theme.muted}
+            text="节点说明"
+            x={padX}
+            y={descSectionY}
+            fontSize={sectionFont}
+            fill={theme.sectionLabel}
+            listening={false}
+          />
+          <Rect
+            x={padX}
+            y={descSectionY + 16}
+            width={nw - padX * 2}
+            height={52}
+            fill={theme.descBg}
+            stroke={theme.descBorder}
+            strokeWidth={1}
+            cornerRadius={descRadius}
+            listening={false}
+          />
+          <Text
+            text={descText}
+            x={padX + 14}
+            y={descSectionY + 28}
+            width={nw - padX * 2 - 28}
+            height={44}
+            fontSize={descFont}
+            fill={theme.bodyText}
+            wrap="word"
             ellipsis
             listening={false}
           />
-        ))}
+        </>
+      )}
 
-      {!compact && def.preview?.enabled && (
+      {hasPreview && (
         <Text
-          text={
-            previewUrl
-              ? "结果预览"
-              : node.status === "error"
-                ? ""
-                : "等待运行结果"
-          }
-          x={12}
-          y={previewCaptionY}
-          fontSize={11}
-          fill={theme.muted}
+          text="输出预览"
+          x={padX}
+          y={previewSectionY}
+          fontSize={sectionFont}
+          fill={theme.sectionLabel}
           listening={false}
         />
       )}
 
-      {!compact && previewImg && def.preview?.enabled && previewH > 0 && (
+      {!compact && previewImg && hasPreview && previewH > 0 && (
         <Group>
           <Rect
             x={previewBox.bx}
@@ -619,7 +581,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             width={previewBox.bw}
             height={previewBox.bh}
             fillLinearGradientStartPoint={{ x: 0, y: 0 }}
-            fillLinearGradientEndPoint={{ x: previewBox.bw, y: previewBox.bh }}
+            fillLinearGradientEndPoint={{ x: 0, y: previewBox.bh }}
             fillLinearGradientColorStops={[
               0,
               theme.previewFrom,
@@ -628,7 +590,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             ]}
             stroke={theme.previewBorder}
             strokeWidth={1}
-            cornerRadius={previewRadius + 4}
+            cornerRadius={previewRadius}
           />
           {previewImgDraw && (
             <KonvaImage
@@ -643,15 +605,15 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         </Group>
       )}
 
-      {!compact && !previewImg && def.preview?.enabled && previewH > 0 && (
+      {!compact && !previewImg && hasPreview && previewH > 0 && (
         <Group>
           <Rect
-            x={12}
+            x={padX}
             y={previewY}
             width={previewW}
             height={previewH}
             fillLinearGradientStartPoint={{ x: 0, y: 0 }}
-            fillLinearGradientEndPoint={{ x: previewW, y: previewH }}
+            fillLinearGradientEndPoint={{ x: 0, y: previewH }}
             fillLinearGradientColorStops={[
               0,
               theme.previewFrom,
@@ -660,7 +622,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
             ]}
             stroke={theme.previewBorderDashed}
             strokeWidth={1}
-            cornerRadius={previewRadius + 4}
+            cornerRadius={previewRadius}
             dash={[6, 5]}
           />
           {node.status === "error" && node.error && (
@@ -693,7 +655,7 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
                 ? ""
                 : "运行后显示结果图"
             }
-            x={12}
+            x={padX}
             y={previewY + previewH / 2 - 8}
             width={previewW}
             align="center"
@@ -758,31 +720,44 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
         />
       )}
 
-      <Rect
-        x={0}
-        y={nh - footerH}
-        width={nw}
-        height={footerH}
-        fill={theme.footerBg}
-        cornerRadius={[0, 0, cardRadius, cardRadius]}
-        listening={false}
-      />
-      <Line
-        points={[0, nh - footerH, nw, nh - footerH]}
-        stroke={theme.divider}
-        strokeWidth={1}
-        listening={false}
-      />
-
       {showRunBar && (
-        <Group y={runBarY}>
+        <Group y={actionsY}>
           <Rect
-            x={14}
-            width={runBtnW}
-            height={runBarH}
-            cornerRadius={runBarH / 2}
+            x={padX}
+            width={btnW}
+            height={AI_NODE_ACTIONS_H}
+            cornerRadius={14}
+            fill={theme.ghostBg}
+            stroke={theme.ghostBorder}
+            strokeWidth={1}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+              setSel([node.id]);
+            }}
+          />
+          {!compact && (
+            <Text
+              text="配置"
+              x={padX}
+              y={0}
+              width={btnW}
+              height={AI_NODE_ACTIONS_H}
+              align="center"
+              verticalAlign="middle"
+              fontSize={14}
+              fontStyle="bold"
+              fill={theme.ghostText}
+              listening={false}
+            />
+          )}
+
+          <Rect
+            x={padX + btnW + AI_NODE_ACTIONS_GAP}
+            width={btnW}
+            height={AI_NODE_ACTIONS_H}
+            cornerRadius={14}
             fillLinearGradientStartPoint={{ x: 0, y: 0 }}
-            fillLinearGradientEndPoint={{ x: runBtnW, y: runBarH }}
+            fillLinearGradientEndPoint={{ x: btnW, y: AI_NODE_ACTIONS_H }}
             fillLinearGradientColorStops={
               node.status === "running"
                 ? [0, theme.runDisabledFrom, 1, theme.runDisabledTo]
@@ -800,33 +775,34 @@ export const WorkflowNodeView = memo(function WorkflowNodeView(props: Props) {
           {compact ? (
             <Text
               text="▶"
-              x={14}
+              x={padX + btnW + AI_NODE_ACTIONS_GAP}
               y={0}
-              width={nw - 28}
-              height={runBarH}
+              width={btnW}
+              height={AI_NODE_ACTIONS_H}
               align="center"
               verticalAlign="middle"
               fontSize={16}
-              fill="#fff"
+              fill={theme.runLabel}
               listening={false}
             />
           ) : (
             <Text
               text={runPrimaryLabel}
-              x={14}
+              x={padX + btnW + AI_NODE_ACTIONS_GAP}
               y={0}
-              width={nw - 28}
-              height={runBarH}
+              width={btnW}
+              height={AI_NODE_ACTIONS_H}
               align="center"
               verticalAlign="middle"
               fontSize={14}
               fontStyle="bold"
-              fill="#fff"
+              fill={theme.runLabel}
               listening={false}
             />
           )}
         </Group>
       )}
+      </Group>
     </Group>
   );
 });

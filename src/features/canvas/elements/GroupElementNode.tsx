@@ -5,6 +5,7 @@ import { EMPTY_ELEMENTS } from "../../editor/store/shallowEqual";
 import type { CanvasElement, ImageElement } from "../../editor/types";
 import { setGuidesRuntime } from "../guides/guidesRuntime";
 import { getSnap } from "./getSnap";
+import { ImageLoadingOverlay } from "./ImageLoadingOverlay";
 import { useCanvasImage } from "./useCanvasImage";
 import {
   gestureHistoryDragEnd,
@@ -91,14 +92,14 @@ function GroupChildImage(props: {
   dx: number;
   dy: number;
 }) {
-  const img = useCanvasImage(props.child.src);
+  const { image: img, loading: imageLoading } = useCanvasImage(props.child.src);
   const c = props.child;
   const baseScale = img
     ? Math.min(c.width / img.width, c.height / img.height)
     : 1;
   const finalScale = baseScale * (c.cropScale || 1);
 
-  if (!img) {
+  if (!img && !imageLoading) {
     return (
       <Rect
         x={props.dx}
@@ -113,6 +114,10 @@ function GroupChildImage(props: {
 
   return (
     <Group x={props.dx} y={props.dy} rotation={c.rotation}>
+      {imageLoading && (
+        <ImageLoadingOverlay width={c.width} height={c.height} />
+      )}
+      {img && (
       <KonvaImage
         image={img}
         x={c.width / 2 + (c.cropOffsetX || 0)}
@@ -127,6 +132,7 @@ function GroupChildImage(props: {
         opacity={c.opacity}
         listening={false}
       />
+      )}
     </Group>
   );
 }

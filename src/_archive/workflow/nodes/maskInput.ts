@@ -1,4 +1,4 @@
-import type { WorkflowNodeDefinition } from "../types";
+import type { WorkflowNodeDefinition } from "../../../features/workflow/model/types";
 
 export const MASK_INPUT_NODE: WorkflowNodeDefinition = {
   type: "mask-input",

@@ -289,7 +289,7 @@ export function CropEditorModal({ imageId, open, onClose }: Props) {
     if (el) setDraft(clone(el));
   }, [open, imageId, sourceEl]);
 
-  const imgLoaded = useCanvasImage(sourceEl?.src);
+  const { image: imgLoaded } = useCanvasImage(sourceEl?.src);
 
   const draftRef = useRef<ImageElement | null>(null);
   useEffect(() => {

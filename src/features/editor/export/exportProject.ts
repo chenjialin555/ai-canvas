@@ -1,5 +1,6 @@
-import { randomImageFilename } from "../lib/randomFilename";
-import type { ImageElement, ProjectJSON } from "./types";
+import { randomImageFilename } from "../../../shared/lib/randomFilename";
+import { toCssCanvasFilter } from "../image-filter/imageFilter";
+import type { ImageElement, ProjectJSON } from "../types";
 
 /** 画布 contain 显示时，外框像素 → 原图像素的倍率 */
 export const MAX_EXPORT_PIXEL_RATIO = 8;
@@ -38,7 +39,7 @@ export async function computeMaxImageExportPixelRatio(
 }
 
 export function downloadJSON(
-  data: ProjectJSON,
+  data: unknown,
   filename = "ai-canvas-project.json",
 ) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -94,19 +95,7 @@ export function applyCanvasFilter(
   ctx: CanvasRenderingContext2D,
   filter: ImageElement["filter"],
 ) {
-  const f = filter || {
-    brightness: 0,
-    contrast: 0,
-    saturation: 0,
-    blur: 0,
-  };
-
-  const brightness = 100 + f.brightness * 100;
-  const contrast = 100 + f.contrast;
-  const saturation = 100 + f.saturation * 100;
-  const blur = f.blur || 0;
-
-  ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px)`;
+  ctx.filter = toCssCanvasFilter(filter);
 }
 
 export function createImageClipPath(
@@ -143,50 +132,13 @@ export function createImageClipPath(
   ctx.quadraticCurveTo(0, 0, r, 0);
 }
 
+import { renderImageElementToDataURL } from "./renderImageElement";
+
 export async function exportCroppedImageAsPNG(el: ImageElement) {
   try {
-    const img = await loadHtmlImage(el.src);
-    const iw = img.naturalWidth || img.width;
-    const ih = img.naturalHeight || img.height;
-
-    /** 与 ImageElementNode 一致：contain；导出时按原图分辨率放大画布 */
-    const containScale = Math.min(el.width / iw, el.height / ih);
-    const outScale =
-      containScale > 0 && Number.isFinite(containScale) ? 1 / containScale : 1;
-    const finalScale = containScale * (el.cropScale || 1);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(el.width * outScale));
-    canvas.height = Math.max(1, Math.round(el.height * outScale));
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.save();
-
-    ctx.scale(outScale, outScale);
-    createImageClipPath(ctx, el);
-    ctx.clip();
-
-    applyCanvasFilter(ctx, el.filter);
-
-    ctx.translate(
-      el.width / 2 + (el.cropOffsetX || 0),
-      el.height / 2 + (el.cropOffsetY || 0),
-    );
-
-    ctx.rotate(((el.cropRotation || 0) * Math.PI) / 180);
-
-    ctx.scale(
-      finalScale * (el.flipX ? -1 : 1),
-      finalScale * (el.flipY ? -1 : 1),
-    );
-
-    ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih);
-
-    ctx.restore();
-
-    downloadDataURL(canvas.toDataURL("image/png"), randomImageFilename("png"));
+    const rendered = await renderImageElementToDataURL(el);
+    if (!rendered) throw new Error("render failed");
+    downloadDataURL(rendered.dataUrl, randomImageFilename("png"));
   } catch {
     alert(
       "导出失败。如果使用的是跨域网络图片，请换成本地 public/assets 图片。",

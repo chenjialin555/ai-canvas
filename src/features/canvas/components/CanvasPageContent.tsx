@@ -5,10 +5,10 @@ import { useEditorStore } from "../../editor/store";
 import type { Store } from "../../editor/store";
 import { EMPTY_STRING_ARRAY } from "../../editor/store/shallowEqual";
 import type { ImageElement } from "../../editor/types";
-import { imageOutputPortOffset } from "../../workflow/nodeLayout";
-import { PORT_COLORS } from "../../workflow/portColors";
+import { imageOutputPortOffset } from "../../../features/workflow/model/nodeLayout";
+import { PORT_COLORS } from "../../../features/workflow/model/portColors";
 import { ElementNode } from "../elements/ElementNode";
-import { WorkflowNodeView } from "../../components/workflow/WorkflowNodeView";
+import { WorkflowNodeView } from "../../../features/workflow/components/WorkflowNodeView";
 
 function selectRootElementIds(s: Store) {
   const page = s.pages.find((p) => p.id === s.activePageId);

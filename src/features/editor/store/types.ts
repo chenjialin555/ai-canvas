@@ -6,8 +6,10 @@ import type {
   ProjectJSON,
   ToolType,
 } from "../types";
-import type { QuickToolId, QuickToolbarScopeKey } from "../quickTools";
-import type { NodeEdge, NodeEndpoint, WorkflowNode } from "../../workflow/types";
+import type { QuickToolId, QuickToolbarScopeKey } from "../quick-tools/quickTools";
+import type { ComfyWorkflowJSON } from "../../workflow/comfy/comfyWorkflowTypes";
+import type { ImportComfyResult } from "../../workflow/comfy/importComfyWorkflow";
+import type { NodeEdge, NodeEndpoint, WorkflowNode } from "../../workflow/model/types";
 
 export type Snapshot = Pick<
   EditorState,
@@ -113,8 +115,10 @@ export type Store = EditorState & {
   renamePage: (id: string, name: string) => void;
   setActivePageId: (id: string) => void;
 
-  exportProjectJSON: () => ProjectJSON;
-  loadProjectJSON: (json: ProjectJSON) => void;
+  exportProjectJSON: () => Promise<ProjectJSON>;
+  loadProjectJSON: (json: ProjectJSON) => Promise<void>;
+  exportComfyWorkflowJSON: () => Promise<ComfyWorkflowJSON>;
+  loadComfyWorkflowJSON: (json: ComfyWorkflowJSON) => ImportComfyResult;
   saveLocal: () => void;
   saveRemote: (url: string) => Promise<void>;
   loadRemote: (url: string) => Promise<void>;

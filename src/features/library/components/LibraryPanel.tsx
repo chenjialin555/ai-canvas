@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
-import { getImageDefaults, useEditorStore } from "../editor/store";
-import type { CanvasElement } from "../editor/types";
-import { loadImageFrameSize } from "../lib/aiImageLayout";
+import { getImageDefaults, useEditorStore } from "../../editor/store";
+import type { CanvasElement } from "../../editor/types";
+import { loadImageFrameSize } from "../../../shared/lib/aiImageLayout";
 
 const assets = [
   {

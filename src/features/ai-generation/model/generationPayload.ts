@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
-import type { CanvasElement } from "../../editor/types";
+import type { CanvasElement } from "../../../features/editor/types";
 import type { ImageProvider } from "./generationTypes";
+import type { GenerationAspectRatio } from "./generationRatio";
 
 export type ModalGenerationFormFields = {
   provider: ImageProvider;
@@ -17,15 +18,23 @@ export type ModalGenerationFormFields = {
 /**
  * 单步弹窗「生成」请求体（与原先 `AiGenerateModal` 内联字段一致）。
  */
+export type PreparedGenerationImage = {
+  imageUrl: string | null;
+  maskDataURL: string | null;
+};
+
 export function buildModalGenerateImagePayload(
   form: ModalGenerationFormFields,
   selected: CanvasElement | undefined,
-  maskDataURL: string | null,
+  prepared: PreparedGenerationImage | null,
+  resolvedRatio: GenerationAspectRatio,
 ): { payload: Record<string, unknown>; traceId: string } {
   const traceId = nanoid();
 
   const sourceImage =
-    selected?.type === "image" ? selected.src : null;
+    prepared?.imageUrl ??
+    (selected?.type === "image" ? selected.src : null);
+  const maskDataURL = prepared?.maskDataURL ?? null;
 
   const mode = maskDataURL
     ? "inpaint"
@@ -40,7 +49,7 @@ export function buildModalGenerateImagePayload(
     image: sourceImage ?? undefined,
     mask: maskDataURL ?? undefined,
     mode,
-    ratio: form.ratio,
+    ratio: resolvedRatio,
     resolution: form.resolution,
     watermark: form.watermark,
     traceId,

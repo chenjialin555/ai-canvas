@@ -1,20 +1,30 @@
 import { nanoid } from "nanoid";
-import { getImageDefaults } from "../../editor/store";
-import { exportImageMaskToDataURL } from "../../image-tools/mask/maskRasterize";
-import type { CanvasElement, Page } from "../../editor/types";
+import { getImageDefaults } from "../../../features/editor/store";
+import {
+  prepareImageElementForApi,
+  type PrepareImagePhase,
+} from "../../../features/editor/export/prepareImageElementForApi";
+import { yieldToMain } from "../../../shared/lib/yieldToMain";
+import type { CanvasElement, Page } from "../../../features/editor/types";
 import {
   logApiEvent,
   summarizePayloadForLog,
   summarizeResponseBodyForLog,
-} from "../../lib/apiDebug";
+} from "../../../shared/lib/apiDebug";
 import { normalizeAiError } from "../errors/normalizeAiError";
-import { apiUrl } from "../api/client";
+import { apiUrl } from "../../../shared/api/client";
 import { postGenerateImage } from "../api/generationApi";
 import {
   buildModalGenerateImagePayload,
   type ModalGenerationFormFields,
-} from "./generationPayload";
-import { layoutNewAiImageBox, loadImageNaturalSize } from "./generationLayout";
+} from "../model/generationPayload";
+import { resolveGenerationRatio } from "../model/generationRatio";
+import { layoutNewAiImageBox, loadImageNaturalSize } from "../model/generationLayout";
+
+export type GenerateImagePhase =
+  | PrepareImagePhase
+  | "request"
+  | "model";
 
 export type GenerateImageFromModalContext = {
   outputMode: "new-layer" | "replace-selected";
@@ -24,6 +34,7 @@ export type GenerateImageFromModalContext = {
   onSuccessClose: () => void;
   addElement: (el: CanvasElement) => void;
   replaceImageKeepFrame: (id: string, url: string) => void;
+  onPhase?: (phase: GenerateImagePhase) => void;
 };
 
 /**
@@ -36,16 +47,38 @@ export async function generateImageFromModal(
     ? ctx.page.elements.find((el) => el.id === ctx.primarySelectedId)
     : undefined;
 
-  const maskDataURL =
-    selected?.type === "image" && selected.aiMask
-      ? exportImageMaskToDataURL(selected)
+  const prepared =
+    selected?.type === "image"
+      ? await prepareImageElementForApi(selected, {
+          apiName: "generate-source",
+          onPhase: (p) => ctx.onPhase?.(p),
+        })
       : null;
+
+  await yieldToMain();
+  ctx.onPhase?.("request");
+
+  const ratioSource = prepared
+    ? { width: prepared.width, height: prepared.height }
+    : selected?.type === "image"
+      ? { width: selected.width, height: selected.height }
+      : null;
+
+  const resolvedRatio = resolveGenerationRatio(ctx.form.ratio, ratioSource);
 
   const { payload, traceId } = buildModalGenerateImagePayload(
     ctx.form,
     selected,
-    maskDataURL,
+    prepared
+      ? {
+          imageUrl: prepared.imageUrl,
+          maskDataURL: prepared.maskDataURL,
+        }
+      : null,
+    resolvedRatio,
   );
+
+  const maskDataURL = prepared?.maskDataURL ?? null;
 
   logApiEvent("request", "POST /api/generate-image", {
     url: apiUrl("/api/generate-image"),
@@ -55,6 +88,7 @@ export async function generateImageFromModal(
     bodyJsonBytes: JSON.stringify(payload).length,
   });
 
+  ctx.onPhase?.("model");
   const apiResult = await postGenerateImage(payload, traceId);
 
   if (!apiResult.ok) {

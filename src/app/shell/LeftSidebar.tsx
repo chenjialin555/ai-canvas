@@ -5,9 +5,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { executeElementCommand } from "../editor/commands/executeElementCommand";
-import { useEditorStore } from "../editor/store";
-import { EMPTY_ELEMENTS } from "../editor/store/shallowEqual";
+import { executeElementCommand, useEditorStore } from "@/features/editor";
+import { EMPTY_ELEMENTS } from "@/features/editor/store/shallowEqual";
 
 function icon(type: string) {
   if (type === "image") return "🖼";

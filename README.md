@@ -39,21 +39,32 @@ Web / 桌面 / 打包对照见 [**docs/guides/desktop-and-web-startup.md**](docs
 
 ## 项目结构
 
+以下为**当前** `src/` 布局（`app` + `features` + `shared`）。细节、数据流与演进说明见 [**docs/工程架构与源码索引.md**](docs/工程架构与源码索引.md)。
+
 ```text
 src/
-├── main.tsx           # 入口：主题、平台、挂载 App
-├── app/               # 应用壳（顶栏、侧栏、画布区、弹窗）
-├── components/        # StageCanvas、工具条、工作流节点视图
-├── canvas/            # 画布层、元素、交互 hooks
-├── editor/            # 类型、Store、commands、导出
-├── ai/                # 单步生图 + 工作流 HTTP
-├── workflow/          # 节点定义与注册表
-├── image-tools/       # 裁剪 / 蒙版 / 全景编辑器
-└── platform/          # Web / Desktop API 地址适配
+├── main.tsx                 # 入口：主题、平台、挂载 App
+├── app/                     # 组装：App、shell/*、hooks/*
+├── features/
+│   ├── editor/              # Zustand、命令、持久化、工程导出
+│   ├── canvas/              # Konva 画布、元素、交互、StageCanvas / MiniMap / Toolbar
+│   ├── workflow/            # 工作流模型、节点 UI、store slice、API、执行服务
+│   ├── ai-generation/       # 单步生图（Modal、API、payload、错误归一）
+│   ├── image-tools/         # 裁剪 / 蒙版 / 全景
+│   ├── library/             # 素材库面板
+│   ├── ai-chat/             # AI 对话侧栏
+│   └── settings/            # 外观与快捷工具条设置
+├── shared/
+│   ├── api/                 # fetch 封装（client、aiClient）
+│   ├── platform/            # Web / Electron API Base
+│   ├── ui/                  # 通用 UI（如 ContextMenu）
+│   ├── lib/                 # 主题、布局、工具函数
+│   ├── hooks/               # 跨模块 hooks
+│   └── types/               # 全局类型补充
+└── styles/                  # 全局 CSS
 
-backend/app/           # FastAPI：providers、executors、OSS
-docs/                  # 维护手册、指南、AI 上下文
-doc/                   # 架构长文、分析报告
+backend/app/                 # FastAPI：providers、executors、OSS
+docs/                        # 维护手册、指南
 ```
 
 ---
@@ -64,19 +75,7 @@ doc/                   # 架构长文、分析报告
 
 ---
 
-## 文档
 
-完整索引与**去重说明**见 [**docs/README.md**](docs/README.md)、[**docs/DOC_MAP.md**](docs/DOC_MAP.md)。
-
-| 我想… | 阅读 |
-|--------|------|
-| **React / 前端入门（本仓库课文）** | [`docs/新生课程介绍/README.md`](docs/新生课程介绍/README.md) |
-| 安装与启动 | [`docs/guides/getting-started.md`](docs/guides/getting-started.md) |
-| 日常改代码 | [`docs/MAINTENANCE_GUIDE.md`](docs/MAINTENANCE_GUIDE.md) |
-| 给 AI 上下文 | [`docs/AI_CONTEXT.md`](docs/AI_CONTEXT.md) |
-| 查架构、数据流、**每个源文件做什么（全表）** | [`doc/PROJECT_ARCHITECTURE.md`](doc/PROJECT_ARCHITECTURE.md)（重点 [**§3 目录导读**](doc/PROJECT_ARCHITECTURE.md#3-仓库目录结构)、[**§18 前端全表**](doc/PROJECT_ARCHITECTURE.md#18-前端源码文件全表)、[**§19 后端全表**](doc/PROJECT_ARCHITECTURE.md#19-后端-python-源码文件全表)） |
-
-测试与构建见 [`docs/guides/testing.md`](docs/guides/testing.md)。
 
 ---
 

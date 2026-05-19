@@ -2,22 +2,22 @@ import type { MutableRefObject } from "react";
 import { useCallback, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import Konva from "konva";
-import { useEditorStore } from "../editor/store";
-import { NodePicker } from "./workflow/NodePicker";
-import { CanvasBackgroundLayer } from "../canvas/components/CanvasBackgroundLayer";
-import { CanvasPageContent } from "../canvas/components/CanvasPageContent";
+import { useEditorStore } from "../../editor/store";
+import { NodePicker } from "../../../features/workflow/components/NodePicker";
+import { CanvasBackgroundLayer } from "./CanvasBackgroundLayer";
+import { CanvasPageContent } from "./CanvasPageContent";
 import {
   CanvasInteractionLayer,
   type CanvasPointerHandlers,
-} from "../canvas/components/CanvasInteractionLayer";
-import { useImperativeViewport } from "../canvas/hooks/useImperativeViewport";
-import { useStageWorkflowDblClick } from "../canvas/hooks/useStageWorkflowDblClick";
-import { useStageKeyboardShortcuts } from "../canvas/hooks/useStageKeyboardShortcuts";
-import { useCanvasDropImport } from "../canvas/hooks/useCanvasDropImport";
+} from "./CanvasInteractionLayer";
+import { useImperativeViewport } from "../hooks/useImperativeViewport";
+import { useStageWorkflowDblClick } from "../hooks/useStageWorkflowDblClick";
+import { useStageKeyboardShortcuts } from "../hooks/useStageKeyboardShortcuts";
+import { useCanvasDropImport } from "../hooks/useCanvasDropImport";
 import {
   useCanvasContextMenu,
-} from "../canvas/hooks/useCanvasContextMenu";
-import type { CanvasContextMenuOpenPayload } from "../canvas/hooks/useCanvasContextMenu";
+} from "../hooks/useCanvasContextMenu";
+import type { CanvasContextMenuOpenPayload } from "../hooks/useCanvasContextMenu";
 
 type StageCanvasProps = {
   onContextMenu: (params: CanvasContextMenuOpenPayload) => void;
@@ -44,7 +44,7 @@ export function StageCanvas(props: StageCanvasProps) {
   const [spacePan, setSpacePan] = useState(false);
   const marqueeSelecting = useEditorStore((s) => s.marqueeSelecting);
 
-  const { handleWheel, syncPanFromStageDragEnd } =
+  const { handleWheel, beginStageViewportInteraction, syncPanFromStageDragEnd } =
     useImperativeViewport(stageRef);
   const { handleStageDblClick } = useStageWorkflowDblClick(stageRef);
   const { onDragOver, onDrop } = useCanvasDropImport({ stageRef });
@@ -75,6 +75,7 @@ export function StageCanvas(props: StageCanvasProps) {
         onDragStart={(e) => {
           const st = stageRef.current;
           if (st && e.target === st) {
+            beginStageViewportInteraction();
             useEditorStore.getState().setFloatingToolbarSuppressed(true);
           }
         }}

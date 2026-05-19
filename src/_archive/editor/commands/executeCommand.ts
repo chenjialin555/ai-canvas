@@ -1,5 +1,5 @@
-import { useEditorStore } from "../store";
-import type { ElementCommand } from "./types";
+import { useEditorStore } from "../../../features/editor/store";
+import type { ElementCommand } from "../../../features/editor/commands/types";
 
 /**
  * 将元素类操作经单一入口分派到 Zustand（内部仍使用现有 slice 与 commitHistory 语义）。

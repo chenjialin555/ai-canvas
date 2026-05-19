@@ -3,7 +3,7 @@ import {
   normalizeQuickToolbarIds,
   type QuickToolId,
   type QuickToolbarScopeKey,
-} from "../../quickTools";
+} from "../../quick-tools/quickTools";
 import type { Store } from "../types";
 import type { StoreGet, StoreSet } from "../sliceTypes";
 

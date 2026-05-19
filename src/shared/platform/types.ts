@@ -1,4 +1,4 @@
-import type { ProjectJSON } from "../editor/types";
+import type { ProjectJSON } from "../../features/editor/types";
 
 export type PlatformId = "web" | "desktop";
 

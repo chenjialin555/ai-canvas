@@ -1,4 +1,4 @@
-import type { CanvasElement } from "../editor/types";
+import type { CanvasElement } from "../../features/editor/types";
 
 export const NEW_AI_IMAGE_GAP = 24;
 /** 画布上图层最长边上限（宽或高），短边按比例缩放，支持 9:16 / 21:9 等任意比例 */

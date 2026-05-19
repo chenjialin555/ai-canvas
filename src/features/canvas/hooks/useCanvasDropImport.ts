@@ -4,7 +4,7 @@ import Konva from "konva";
 import { nanoid } from "nanoid";
 import { getImageDefaults, useEditorStore } from "../../editor/store";
 import type { CanvasElement } from "../../editor/types";
-import { loadImageFrameSize } from "../../lib/aiImageLayout";
+import { loadImageFrameSize } from "../../../shared/lib/aiImageLayout";
 import { screenToWorld } from "../utils/coordinates";
 
 function readImageFile(file: File): Promise<string> {

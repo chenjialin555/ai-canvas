@@ -1,4 +1,5 @@
 import type { WorkflowNodeDefinition } from "./types";
+import { COMFY_BRIDGE_NODE } from "./nodes/comfyBridge";
 import { INPAINT_NODE } from "./nodes/inpaint";
 import { OUTPUT_VIEW_NODE } from "./nodes/outputView";
 import { OUTPAINT_NODE } from "./nodes/outpaint";
@@ -11,6 +12,7 @@ export const WORKFLOW_NODE_REGISTRY: Record<string, WorkflowNodeDefinition> = {
   [STYLE_TRANSFER_NODE.type]: STYLE_TRANSFER_NODE,
   [UPSCALE_NODE.type]: UPSCALE_NODE,
   [OUTPAINT_NODE.type]: OUTPAINT_NODE,
+  [COMFY_BRIDGE_NODE.type]: COMFY_BRIDGE_NODE,
 };
 
 export function getWorkflowNodeDefinition(type: string): WorkflowNodeDefinition {

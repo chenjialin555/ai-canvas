@@ -7,7 +7,7 @@ import dashscope
 from dashscope import MultiModalConversation
 
 from backend.app.core.settings import Settings
-from backend.app.schemas.generation import GenerateImageRequest
+from backend.app.modules.generation.schemas import GenerateImageRequest
 
 MAX_RETRIES = 3
 

@@ -573,6 +573,38 @@
   color: var(--ac-brand);
 }
 
+/* ---- 图片调整浮层 ---- */
+.image-adjust-panel {
+  border-radius: var(--ac-radius-lg);
+  border: 1px solid var(--ac-border-strong);
+  background: var(--elevated);
+  box-shadow: var(--ac-shadow-md);
+  backdrop-filter: none;
+}
+
+.image-adjust-panel__head {
+  border-bottom-color: var(--ac-border);
+}
+
+.image-adjust-panel__title {
+  color: var(--ac-text);
+}
+
+.image-adjust-tabs {
+  background: var(--panel-2);
+  border-bottom-color: var(--ac-border);
+}
+
+.image-adjust-tabs__btn--active {
+  background: var(--ac-brand-soft);
+  color: var(--ac-brand);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-brand) 35%, transparent);
+}
+
+.image-adjust-slider {
+  accent-color: var(--ac-brand);
+}
+
 /* ---- Konva 文字编辑 ---- */
 .konva-textarea {
   border-color: var(--ac-brand) !important;

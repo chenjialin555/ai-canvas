@@ -228,7 +228,7 @@ select {
   flex: 1;
   min-width: 0;
   position: relative;
-  background: #eef5f5;
+  background: #ffffff;
 }
 
 .tabs {
@@ -267,7 +267,7 @@ select {
   position: absolute;
   inset: 34px 0 0 0;
   overflow: hidden;
-  background: #eef5f5;
+  background: #ffffff;
 }
 
 .konva-wrap--space-pan {
@@ -1949,7 +1949,7 @@ select {
   border-color: #f2caca !important;
 }
 
-/* —— 浮动快捷工具条（与顶栏 / 画布区浅色 UI 一致） —— */
+/* —— 浮动快捷工具条（随 themes.css 变量切换） —— */
 .floating-toolbar {
   position: fixed;
   z-index: 8000;
@@ -1959,20 +1959,21 @@ select {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: #ffffff;
-  border: 1px solid #e4ecec;
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.1);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   pointer-events: auto;
+  backdrop-filter: blur(18px);
 }
 
 .floating-toolbar__btn {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: #4b5563;
+  color: var(--text-2);
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
@@ -1980,27 +1981,176 @@ select {
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .floating-toolbar__btn:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--panel-3);
+  color: var(--text);
 }
 
 .floating-toolbar__btn:active {
-  background: #e8fbfb;
-  color: #0d9488;
+  background: color-mix(in srgb, var(--brand) 16%, var(--panel-3));
+  color: var(--brand);
 }
 
 .floating-toolbar__btn--lead {
-  background: #f7fbfb;
-  border: 1px solid #dff7f7;
-  color: #42c4c4;
+  background: color-mix(in srgb, var(--brand) 12%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  color: var(--brand);
 }
 
 .floating-toolbar__btn--lead:hover {
-  background: #dff7f7;
-  color: #0f766e;
+  background: color-mix(in srgb, var(--brand) 20%, var(--panel));
+  color: var(--brand-2);
+}
+
+.floating-toolbar__btn--active {
+  background: color-mix(in srgb, var(--brand) 18%, var(--panel-3));
+  color: var(--brand);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 32%, transparent);
+}
+
+/* —— 图片调整浮层（快捷条「调整」；颜色走 themes.css 变量，随主题切换） —— */
+.image-adjust-panel {
+  position: fixed;
+  z-index: 8100;
+  width: 280px;
+  max-height: min(420px, calc(100vh - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  pointer-events: auto;
+  overflow: hidden;
+  backdrop-filter: blur(18px);
+}
+
+.image-adjust-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--panel-3), var(--panel));
+}
+
+.image-adjust-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.image-adjust-panel__actions {
+  display: flex;
+  gap: 4px;
+}
+
+.image-adjust-panel__icon-btn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.image-adjust-panel__icon-btn:hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+
+.image-adjust-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.image-adjust-tabs__btn {
+  flex: 1;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 16px;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.image-adjust-tabs__btn:hover {
+  background: var(--panel-3);
+  color: var(--text-2);
+}
+
+.image-adjust-tabs__btn--active {
+  background: color-mix(in srgb, var(--brand) 14%, var(--panel-2));
+  color: var(--brand);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 28%, transparent);
+}
+
+.image-adjust-panel__body {
+  padding: 8px 12px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+}
+
+.image-adjust-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  align-items: center;
+}
+
+.image-adjust-row__label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.image-adjust-row__value {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.image-adjust-slider {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+  background: var(--panel-3);
+  border-radius: 2px;
+}
+
+.image-adjust-slider--temperature {
+  accent-color: transparent;
+  background: linear-gradient(90deg, #3b82f6, #fbbf24);
+}
+
+.image-adjust-slider--tint {
+  accent-color: transparent;
+  background: linear-gradient(90deg, #22c55e, #ec4899);
 }
 
 .toolbar-toast {

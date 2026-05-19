@@ -1,4 +1,4 @@
-import { apiPostJson } from "./aiClient";
+import { apiPostJson } from "../../../shared/api/aiClient";
 
 export type PostGenerateImageResult =
   | {

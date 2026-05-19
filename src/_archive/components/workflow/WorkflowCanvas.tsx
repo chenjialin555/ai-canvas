@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Layer, Line, Stage } from "react-konva";
 import Konva from "konva";
-import { useEditorStore } from "../../editor/store";
-import { getWorkflowNodeDefinition } from "../../workflow/nodeRegistry";
+import { useEditorStore } from "../../../features/editor/store";
+import { getWorkflowNodeDefinition } from "../../../features/workflow/model/nodeRegistry";
 import {
   AI_NODE_INPUT_PORT_CX,
   AI_NODE_OUTPUT_PORT_CX,
   AI_NODE_PORT_GAP,
   AI_NODE_PORT_TOP,
   bezierHorizontalOffset,
-} from "../../workflow/nodeLayout";
-import { PORT_COLORS } from "../../workflow/portColors";
-import type { WorkflowNode } from "../../workflow/types";
-import { NodePicker } from "./NodePicker";
-import { WorkflowNodeView } from "./WorkflowNodeView";
+} from "../../../features/workflow/model/nodeLayout";
+import { PORT_COLORS } from "../../../features/workflow/model/portColors";
+import type { WorkflowNode } from "../../../features/workflow/model/types";
+import { NodePicker } from "../../../features/workflow/components/NodePicker";
+import { WorkflowNodeView } from "../../../features/workflow/components/WorkflowNodeView";
 
 type Props = {
   width: number;

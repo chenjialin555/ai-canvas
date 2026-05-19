@@ -7,6 +7,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
+    "typecheck": "tsc -b --pretty",
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:api\"",
     "dev:no-reload": "concurrently \"npm run dev:client:no-reload\" \"npm run dev:api:no-reload\"",
     "dev:web": "vite",

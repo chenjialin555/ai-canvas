@@ -1,7 +1,7 @@
 import { Line } from "react-konva";
 import type { Page } from "../../editor/types";
-import type { WorkflowConnectingState } from "../../workflow/types";
-import { tempWireFromEndpoint } from "../../workflow/utils/unifiedGraph";
+import type { WorkflowConnectingState } from "../../../features/workflow/model/types";
+import { tempWireFromEndpoint } from "../../../features/workflow/utils/unifiedGraph";
 
 export type TemporaryWorkflowConnectionProps = {
   page: Page;

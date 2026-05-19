@@ -1,30 +1,20 @@
 import { nanoid } from "nanoid";
-import { getWorkflowNodeDefinition } from "../nodeRegistry";
+import { getWorkflowNodeDefinition } from "../model/nodeRegistry";
 import {
-  AI_NODE_MAX_HEIGHT,
-  AI_NODE_MIN_HEIGHT,
   AI_NODE_MIN_WIDTH,
-  AI_NODE_PORT_GAP,
-  AI_NODE_PORT_ROW_START,
-  AI_NODE_PREVIEW_MAX_H,
-} from "../nodeLayout";
-import type { WorkflowNode } from "../types";
+  computeWorkflowNodeHeight,
+} from "../model/nodeLayout";
+import type { WorkflowNode } from "../model/types";
 
-const NODE_W = 280;
-
-export function defaultWorkflowNodeSize(type: string): { width: number; height: number } {
+export function defaultWorkflowNodeSize(type: string): {
+  width: number;
+  height: number;
+} {
   const def = getWorkflowNodeDefinition(type);
-  const inputRows = def.inputs.length;
-  const outputRows = def.outputs.length;
-  const portRows = Math.max(inputRows, outputRows, 1);
-  const portBottom = AI_NODE_PORT_ROW_START + portRows * AI_NODE_PORT_GAP;
-  const summaryH = def.params.length > 0 ? 40 : 10;
-  const previewBlock = def.preview?.enabled ? AI_NODE_PREVIEW_MAX_H + 28 : 0;
-  const footer = 56;
-  let h = portBottom + summaryH + previewBlock + footer;
-  h = Math.max(AI_NODE_MIN_HEIGHT, Math.min(AI_NODE_MAX_HEIGHT, h));
-  const w = Math.max(AI_NODE_MIN_WIDTH, NODE_W);
-  return { width: w, height: h };
+  return {
+    width: AI_NODE_MIN_WIDTH,
+    height: computeWorkflowNodeHeight(def),
+  };
 }
 
 export function createWorkflowNode(

@@ -1,8 +1,8 @@
-import type { CanvasElement } from "../../../editor/types";
-import { getImageDefaults } from "../../../editor/store/helpers/imageDefaults";
-import { loadImageFrameSize } from "../../../lib/aiImageLayout";
+import type { CanvasElement } from "../../../features/editor/types";
+import { getImageDefaults } from "../../../features/editor/store/helpers/imageDefaults";
+import { loadImageFrameSize } from "../../../shared/lib/aiImageLayout";
 import { nanoid } from "nanoid";
-import type { WorkflowNode } from "../../../workflow/types";
+import type { WorkflowNode } from "../model/types";
 
 /**
  * 将节点图像类输出落到画布（外框按输出图原始比例，不再固定 520×320）。

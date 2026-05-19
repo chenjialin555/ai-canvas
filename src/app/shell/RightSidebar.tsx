@@ -1,10 +1,13 @@
-import { AiChatPanel } from "../components/AiChatPanel";
-import { executeElementCommand } from "../editor/commands/executeElementCommand";
-import { exportCroppedImageAsPNG } from "../editor/export";
-import { useEditorStore } from "../editor/store";
-import type { CanvasElement, ImageElement } from "../editor/types";
-import { loadImageFrameSize, replaceImageWithFitFrame } from "../lib/aiImageLayout";
-import type { RightPanelTab } from "./hooks/useAppModals";
+import { AiChatPanel } from "@/features/ai-chat";
+import {
+  exportCroppedImageAsPNG,
+  executeElementCommand,
+  useEditorStore,
+} from "@/features/editor";
+import { DEFAULT_IMAGE_FILTER } from "@/features/editor/image-filter/imageFilter";
+import type { CanvasElement, ImageElement } from "@/features/editor/types";
+import { loadImageFrameSize, replaceImageWithFitFrame } from "../../shared/lib/aiImageLayout";
+import type { RightPanelTab } from "../hooks/useAppModals";
 
 export function RightSidebar(props: {
   tab: RightPanelTab;
@@ -409,9 +412,9 @@ function ImageInspector(props: { selected: ImageElement }) {
 
       <FilterRange
         label="亮度"
-        min={-1}
-        max={1}
-        step={0.01}
+        min={-100}
+        max={100}
+        step={1}
         value={selected.filter?.brightness ?? 0}
         onChange={(v) => patchFilter({ brightness: v })}
         onCommit={commitFilterGesture}
@@ -429,9 +432,9 @@ function ImageInspector(props: { selected: ImageElement }) {
 
       <FilterRange
         label="饱和"
-        min={-2}
-        max={2}
-        step={0.01}
+        min={-100}
+        max={100}
+        step={1}
         value={selected.filter?.saturation ?? 0}
         onChange={(v) => patchFilter({ saturation: v })}
         onCommit={commitFilterGesture}
@@ -440,7 +443,7 @@ function ImageInspector(props: { selected: ImageElement }) {
       <FilterRange
         label="模糊"
         min={0}
-        max={30}
+        max={100}
         step={1}
         value={selected.filter?.blur ?? 0}
         onChange={(v) => patchFilter({ blur: v })}
@@ -455,12 +458,7 @@ function ImageInspector(props: { selected: ImageElement }) {
             type: "updateElement",
             id: selected.id,
             patch: {
-              filter: {
-                brightness: 0,
-                contrast: 0,
-                saturation: 0,
-                blur: 0,
-              },
+              filter: { ...DEFAULT_IMAGE_FILTER },
             } as Partial<CanvasElement>,
           })
         }

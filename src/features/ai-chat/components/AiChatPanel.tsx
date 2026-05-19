@@ -1,21 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { getImageDefaults, useEditorStore } from "../editor/store";
-import type { CanvasElement } from "../editor/types";
+import { getImageDefaults, useEditorStore } from "../../editor/store";
+import type { CanvasElement } from "../../editor/types";
 import {
   logApiEvent,
   summarizePayloadForLog,
   summarizeResponseBodyForLog,
-} from "../lib/apiDebug";
-import { formatApiDetail } from "../lib/apiFormat";
-import { layoutNewAiImageBox, loadImageNaturalSize } from "../lib/aiImageLayout";
+} from "../../../shared/lib/apiDebug";
+import { formatApiDetail } from "../../../shared/lib/apiFormat";
+import { layoutNewAiImageBox, loadImageNaturalSize } from "../../../shared/lib/aiImageLayout";
+import {
+  GENERATION_ASPECT_RATIOS,
+  GENERATION_RATIO_AUTO,
+  resolveGenerationRatio,
+} from "../../ai-generation/model/generationRatio";
 import {
   MODEL_CHOICES,
   PROVIDERS,
   type ImageProvider,
-} from "../ai/generation/generationTypes";
-import { apiUrl } from "../ai/api/client";
-import { postGenerateImage } from "../ai/api/generationApi";
+} from "../../ai-generation/model/generationTypes";
+import { apiUrl } from "../../../shared/api/client";
+import { postGenerateImage } from "../../ai-generation/api/generationApi";
+import { prepareImageElementForApi } from "../../editor/export/prepareImageElementForApi";
 
 type ChatMsg =
   | {
@@ -75,7 +81,24 @@ export function AiChatPanel(props: Props) {
     if (!trimmed || loading) return;
 
     const page = getActivePage();
-    const srcList = resolved.map((r) => r.src);
+    const srcList: string[] = [];
+    let maskDataURL: string | null = null;
+    let ratioSource: { width: number; height: number } | null = null;
+    for (const r of resolved) {
+      const el = page.elements.find((e) => e.id === r.elementId);
+      if (el?.type !== "image") continue;
+      const prepared = await prepareImageElementForApi(el, { apiName: "chat-ref" });
+      srcList.push(prepared.imageUrl);
+      if (!ratioSource) {
+        ratioSource = { width: prepared.width, height: prepared.height };
+      }
+      if (!maskDataURL && prepared.maskDataURL) {
+        maskDataURL = prepared.maskDataURL;
+      }
+    }
+
+    const resolvedRatio = resolveGenerationRatio(ratio, ratioSource);
+
     const image = srcList[0];
     const referenceImages =
       srcList.length > 1 ? srcList.slice(1) : undefined;
@@ -86,8 +109,11 @@ export function AiChatPanel(props: Props) {
       fullPrompt += `\n\n（画布参考顺序：${labels}）`;
     }
 
-    const mode =
-      srcList.length > 0 ? "image-to-image" : "generate";
+    const mode = maskDataURL
+      ? "inpaint"
+      : srcList.length > 0
+        ? "image-to-image"
+        : "generate";
 
     const firstRef = page.elements.find((e) => e.id === attachmentIds[0]);
     const refForLayout =
@@ -99,12 +125,13 @@ export function AiChatPanel(props: Props) {
       model,
       prompt: fullPrompt,
       mode,
-      ratio,
+      ratio: resolvedRatio,
       resolution,
       traceId,
       clientId: "web",
     };
     if (image) payload.image = image;
+    if (maskDataURL) payload.mask = maskDataURL;
     if (referenceImages?.length) payload.referenceImages = referenceImages;
 
     const userMsg: ChatMsg = {
@@ -309,12 +336,14 @@ export function AiChatPanel(props: Props) {
           className="ai-chat-select"
           value={ratio}
           onChange={(e) => setRatio(e.target.value)}
+          title="AUTO 将按第一张参考图外框匹配最接近比例"
         >
-          <option value="1x1">1×1</option>
-          <option value="2x3">2×3</option>
-          <option value="3x2">3×2</option>
-          <option value="16x9">16×9</option>
-          <option value="9x16">9×16</option>
+          <option value={GENERATION_RATIO_AUTO}>AUTO</option>
+          {GENERATION_ASPECT_RATIOS.map((r) => (
+            <option key={r} value={r}>
+              {r.replace("x", "×")}
+            </option>
+          ))}
         </select>
         <select
           className="ai-chat-select"

@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { WorkflowNode } from "../../../workflow/types";
+import type { WorkflowNode } from "../model/types";
 import { postWorkflowRunNode } from "../api/workflowApi";
 
 /**

@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.app.schemas.upload import UploadImageURLRequest
-from backend.app.services import upload_service
+from backend.app.modules.upload.schemas import UploadImageURLRequest
+from backend.app.modules.upload.service import upload_service
 
 log = logging.getLogger("ai_canvas.api")
 

@@ -1,74 +1,84 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Group, Image as KonvaImage, Rect, Text } from "react-konva";
-import Konva from "konva";
 import type { SceneContext } from "konva/lib/Context";
-import type { Filter } from "konva/lib/Node";
 import { useEditorStore } from "../../editor/store";
+import { normalizeImageFilter } from "../../editor/image-filter/imageFilter";
+import { imageFilterRevision } from "../../editor/image-filter/filterRevision";
+import { useFilteredImageSource } from "./useFilteredImageSource";
 import type { ImageElement, ImageMaskData } from "../../editor/types";
-import { exportMaskToDataURL } from "../../image-tools/mask/maskRasterize";
+import { exportMaskToDataURL } from "../../../features/image-tools/mask/maskRasterize";
 import { commonProps } from "./commonProps";
+import { ImageLoadingOverlay } from "./ImageLoadingOverlay";
 import { useCanvasImage } from "./useCanvasImage";
+
+function VignetteOverlay(props: {
+  width: number;
+  height: number;
+  strength: number;
+}) {
+  if (!props.strength) return null;
+  const opacity = Math.min(0.75, (Math.abs(props.strength) / 100) * 0.65);
+  const r = Math.max(props.width, props.height) * 0.72;
+
+  return (
+    <Rect
+      x={0}
+      y={0}
+      width={props.width}
+      height={props.height}
+      listening={false}
+      fillRadialGradientStartPoint={{ x: props.width / 2, y: props.height / 2 }}
+      fillRadialGradientEndPoint={{ x: props.width / 2, y: props.height / 2 }}
+      fillRadialGradientStartRadius={0}
+      fillRadialGradientEndRadius={r}
+      fillRadialGradientColorStops={[0, "rgba(0,0,0,0)", 1, `rgba(0,0,0,${opacity})`]}
+    />
+  );
+}
 
 function FilteredImage(props: {
   image: HTMLImageElement;
   element: ImageElement;
+  filterRevision: string;
   finalScale: number;
 }) {
-  const imageRef = useRef<Konva.Image | null>(null);
-  const { image, element, finalScale } = props;
+  const { image, element, filterRevision, finalScale } = props;
+  const filter = normalizeImageFilter(element.filter);
 
-  const filter = element.filter;
-
-  useEffect(() => {
-    const node = imageRef.current;
-    if (!node) return;
-
-    node.cache();
-    node.getLayer()?.batchDraw();
-
-    return () => {
-      node.clearCache();
-    };
-  }, [
-    image,
-    filter.brightness,
-    filter.contrast,
-    filter.saturation,
-    filter.blur,
-    element.cropScale,
-    element.cropRotation,
-    element.flipX,
-    element.flipY,
-  ]);
-
-  const filters: Filter[] = [];
-
-  if (filter.brightness !== 0) filters.push(Konva.Filters.Brighten);
-  if (filter.contrast !== 0) filters.push(Konva.Filters.Contrast);
-  if (filter.saturation !== 0) filters.push(Konva.Filters.HSV);
-  if (filter.blur !== 0) filters.push(Konva.Filters.Blur);
+  const displayImage =
+    useFilteredImageSource(image, filterRevision, filter) ?? image;
+  const iw =
+    (displayImage instanceof HTMLCanvasElement
+      ? displayImage.width
+      : displayImage.naturalWidth) || displayImage.width;
+  const ih =
+    (displayImage instanceof HTMLCanvasElement
+      ? displayImage.height
+      : displayImage.naturalHeight) || displayImage.height;
 
   return (
-    <KonvaImage
-      ref={imageRef}
-      image={image}
-      x={element.width / 2 + (element.cropOffsetX || 0)}
-      y={element.height / 2 + (element.cropOffsetY || 0)}
-      offsetX={image.width / 2}
-      offsetY={image.height / 2}
-      width={image.width}
-      height={image.height}
-      scaleX={finalScale * (element.flipX ? -1 : 1)}
-      scaleY={finalScale * (element.flipY ? -1 : 1)}
-      rotation={element.cropRotation || 0}
-      listening={false}
-      draggable={false}
-      filters={filters}
-      brightness={filter.brightness}
-      contrast={filter.contrast}
-      saturation={filter.saturation}
-      blurRadius={filter.blur}
-    />
+    <>
+      <KonvaImage
+        key={filterRevision}
+        image={displayImage}
+        x={element.width / 2 + (element.cropOffsetX || 0)}
+        y={element.height / 2 + (element.cropOffsetY || 0)}
+        offsetX={iw / 2}
+        offsetY={ih / 2}
+        width={iw}
+        height={ih}
+        scaleX={finalScale * (element.flipX ? -1 : 1)}
+        scaleY={finalScale * (element.flipY ? -1 : 1)}
+        rotation={element.cropRotation || 0}
+        listening={false}
+        draggable={false}
+      />
+      <VignetteOverlay
+        width={element.width}
+        height={element.height}
+        strength={filter.vignette}
+      />
+    </>
   );
 }
 
@@ -128,8 +138,14 @@ export type ImageElementNodeProps = {
 export const ImageElementNode = memo(function ImageElementNode(
   props: ImageElementNodeProps,
 ) {
-  const image = useCanvasImage(props.element.src);
+  const { image, loading: imageLoading } = useCanvasImage(props.element.src);
   const element = props.element;
+
+  const filterRevision = imageFilterRevision(
+    normalizeImageFilter(element.filter),
+  );
+  const placeholderRadius =
+    element.maskShape === "roundRect" ? element.cornerRadius || 0 : 0;
 
   const isSelected = useEditorStore((s) => s.selectedIds.includes(element.id));
 
@@ -221,10 +237,19 @@ export const ImageElementNode = memo(function ImageElementNode(
           listening={false}
         />
 
+        {imageLoading && (
+          <ImageLoadingOverlay
+            width={element.width}
+            height={element.height}
+            cornerRadius={placeholderRadius}
+          />
+        )}
+
         {image && (
           <FilteredImage
             image={image}
             element={element}
+            filterRevision={filterRevision}
             finalScale={finalScale}
           />
         )}

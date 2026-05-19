@@ -25,6 +25,7 @@ export function migratePage(p: Page): Page {
   };
 }
 
+/** 空白页：无示例元素、无 AI 工作流节点与连线 */
 export function makeDefaultPage(): Page {
   return {
     id: nanoid(),
@@ -33,4 +34,8 @@ export function makeDefaultPage(): Page {
     aiNodes: [],
     edges: [],
   };
+}
+
+export function makeBlankProjectPages(): Page[] {
+  return [makeDefaultPage()];
 }

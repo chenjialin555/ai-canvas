@@ -2,11 +2,11 @@ import type { RefObject } from "react";
 import { Layer } from "react-konva";
 import Konva from "konva";
 import type { Page } from "../../editor/types";
-import type { WorkflowConnectingState } from "../../workflow/types";
-import { AlignmentGuides } from "../interaction/AlignmentGuides";
-import { MarqueeSelection } from "../interaction/MarqueeSelection";
-import { SelectionTransformer } from "../interaction/SelectionTransformer";
-import { TemporaryWorkflowConnection } from "../interaction/TemporaryWorkflowConnection";
+import type { WorkflowConnectingState } from "../../../features/workflow/model/types";
+import { AlignmentGuides } from "../interactions/AlignmentGuides";
+import { MarqueeSelection } from "../interactions/MarqueeSelection";
+import { SelectionTransformer } from "../interactions/SelectionTransformer";
+import { TemporaryWorkflowConnection } from "../interactions/TemporaryWorkflowConnection";
 
 export type InteractionLayerProps = {
   selectionVisible: boolean;

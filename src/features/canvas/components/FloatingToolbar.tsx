@@ -1,30 +1,19 @@
 import type { MutableRefObject } from "react";
-import { memo, useLayoutEffect, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ImageAdjustPanel } from "../../image-tools/adjust/ImageAdjustPanel";
 import type { Stage } from "konva/lib/Stage";
 import {
   getToolById,
   type QuickTool,
   type QuickToolId,
-} from "../editor/quickTools";
-import { executeElementCommand } from "../editor/commands/executeElementCommand";
-import { useEditorStore } from "../editor/store";
-import type { CanvasElement } from "../editor/types";
+} from "../../editor/quick-tools/quickTools";
+import { executeElementCommand } from "../../editor/commands/executeElementCommand";
+import { useEditorStore } from "../../editor/store";
+import type { CanvasElement } from "../../editor/types";
+import { worldToScreen } from "../utils/coordinates";
 
-/** 与 StageCanvas `screenToWorld` 互逆 */
 const TOOLBAR_GAP = 10;
-
-function worldToStageClient(
-  wx: number,
-  wy: number,
-  zoom: number,
-  pan: { x: number; y: number },
-): { x: number; y: number } {
-  return {
-    x: wx * zoom + pan.x,
-    y: wy * zoom + pan.y,
-  };
-}
 
 /** 与 Konva Group 一致：先 translate(x,y) 再 rotate，绕本地 (0,0) 即元素左上角，非矩形中心 */
 function worldAabb(el: CanvasElement): {
@@ -76,19 +65,24 @@ function unionWorldAabb(
   return u;
 }
 
-/** 视口 CSS 像素：锚点为选中包络顶边中点略上方（由 CSS translate(-50%,-100%) 再整体上移） */
+/**
+ * 视口 CSS 像素：锚点为选中包络顶边中点略上方（由 CSS translate(-50%,-100%) 再整体上移）。
+ * 必须用 Stage 当前的 scale/position：滚轮缩放时 Konva 先更新 Stage，Zustand 延迟同步，读 store 会错位。
+ */
 function toolbarAnchorViewport(
   stage: Stage,
   els: CanvasElement[],
-  zoom: number,
-  pan: { x: number; y: number },
 ): { left: number; top: number } | null {
   const b = unionWorldAabb(els);
   if (!b) return null;
   const cr = stage.container().getBoundingClientRect();
   const centerW = (b.minX + b.maxX) / 2;
   const topW = b.minY;
-  const sc = worldToStageClient(centerW, topW, zoom, pan);
+  const viewport = {
+    zoom: stage.scaleX(),
+    pan: { x: stage.x(), y: stage.y() },
+  };
+  const sc = worldToScreen({ x: centerW, y: topW }, viewport);
   return {
     left: cr.left + sc.x,
     top: cr.top + sc.y - TOOLBAR_GAP,
@@ -145,6 +139,7 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
   });
 
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [adjustImageId, setAdjustImageId] = useState<string | null>(null);
 
   const page = getActivePage();
   const selectedEls = page.elements.filter((el) =>
@@ -160,6 +155,12 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
   const tools = configIds
     .map(getToolById)
     .filter((t): t is QuickTool => !!t && toolVisible(t, n, types));
+
+  useEffect(() => {
+    if (n !== 1 || selectedEls[0]?.type !== "image") {
+      setAdjustImageId(null);
+    }
+  }, [n, selectedIds.join(",")]);
 
   useLayoutEffect(() => {
     if (
@@ -194,8 +195,7 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
         setPos(null);
         return;
       }
-      const p = toolbarAnchorViewport(st, els, state.zoom, state.pan);
-      setPos(p);
+      setPos(toolbarAnchorViewport(st, els));
     }
 
     /** 等 Konva Transformer / 节点布局一帧后再量，避免 getClientRect 仍为 0 */
@@ -208,12 +208,17 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
     }
 
     measureDeferred();
+    const container = stage.container();
+    const onWheel = () => measureDeferred();
+    /** 滚轮改的是 Stage，store 防抖期间仍要跟着重算位置 */
+    container.addEventListener("wheel", onWheel, { passive: true });
     const ro = new ResizeObserver(measureDeferred);
-    ro.observe(stage.container());
+    ro.observe(container);
 
     return () => {
       cancelAnimationFrame(raf);
       cancelAnimationFrame(raf2);
+      container.removeEventListener("wheel", onWheel);
       ro.disconnect();
     };
   }, [
@@ -252,12 +257,18 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
     const el = selectedEls[0];
     if (!el) return;
 
-    if (id === "crop" && el.type === "image") props.onCrop(el.id);
-    if (id === "mask" && el.type === "image") props.onMask(el.id);
-    if (id === "parse3d" && el.type === "image") props.onParse3d(el.id);
-    if (id === "ai-edit" && el.type === "image") {
-      props.onOpenAI({ imageId: el.id, mode: "replace-selected" });
+    if (id === "crop" && el.type === "image") {
+      setAdjustImageId(null);
+      props.onCrop(el.id);
     }
+    if (id === "adjust" && el.type === "image") {
+      setAdjustImageId((cur) => (cur === el.id ? null : el.id));
+    }
+    if (id === "mask" && el.type === "image") {
+      setAdjustImageId(null);
+      props.onMask(el.id);
+    }
+    if (id === "parse3d" && el.type === "image") props.onParse3d(el.id);
     if (id === "generate-node" && el.type === "image") {
       props.onOpenAI({ imageId: el.id, mode: "new-layer" });
     }
@@ -270,7 +281,7 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
     if (id === "copy") executeElementCommand({ type: "copy" });
     if (id === "delete") executeElementCommand({ type: "removeSelected" });
     if (id === "lock") {
-      executeElementCommand({ type: "toggleLock", id: el.id });
+      executeElementCommand({ type: "toggleLock", id: el.id }); 
     }
     if (id === "bring-front") executeElementCommand({ type: "bringToFront", id: el.id });
     if (id === "send-back") executeElementCommand({ type: "sendToBack", id: el.id });
@@ -291,24 +302,44 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
       role="toolbar"
       aria-label="快捷工具条"
     >
-      {tools.map((tool, i) => (
-        <button
-          key={tool.id}
-          type="button"
-          className={
-            i === 0
-              ? "floating-toolbar__btn floating-toolbar__btn--lead"
-              : "floating-toolbar__btn"
-          }
-          title={tool.label}
-          aria-label={tool.label}
-          onClick={() => runTool(tool.id)}
-        >
-          <span aria-hidden>{tool.icon}</span>
-        </button>
-      ))}
+      {tools.map((tool, i) => {
+        const isAdjustActive =
+          tool.id === "adjust" && adjustImageId === selectedEls[0]?.id;
+        let cls = "floating-toolbar__btn";
+        if (i === 0) cls += " floating-toolbar__btn--lead";
+        if (isAdjustActive) cls += " floating-toolbar__btn--active";
+
+        return (
+          <button
+            key={tool.id}
+            type="button"
+            className={cls}
+            title={tool.label}
+            aria-label={tool.label}
+            aria-pressed={isAdjustActive || undefined}
+            onClick={() => runTool(tool.id)}
+          >
+            <span aria-hidden>{tool.icon}</span>
+          </button>
+        );
+      })}
     </div>
   );
 
-  return createPortal(bar, document.body);
+  const adjustPanel =
+    adjustImageId && pos ? (
+      <ImageAdjustPanel
+        imageId={adjustImageId}
+        anchor={{ left: pos.left, top: pos.top }}
+        onClose={() => setAdjustImageId(null)}
+      />
+    ) : null;
+
+  return createPortal(
+    <>
+      {bar}
+      {adjustPanel}
+    </>,
+    document.body,
+  );
 });

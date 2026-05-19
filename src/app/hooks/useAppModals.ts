@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import type { ContextMenuState } from "../../components/ContextMenu";
-import type { ImageEditorTool } from "../../image-tools/types";
+import type { ContextMenuState } from "../../shared/ui/ContextMenu";
+import type { ImageEditorTool } from "../../features/image-tools/types";
 
 export type RightPanelTab = "properties" | "aiGenerate" | "aiChat";
 

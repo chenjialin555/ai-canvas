@@ -1,3 +1,7 @@
+import type { ImageFilter } from "./image-filter/imageFilter";
+
+export type { ImageFilter } from "./image-filter/imageFilter";
+
 export type ElementType = "image" | "rect" | "text" | "arrow" | "group";
 
 export type ImageMaskShape = "rect" | "roundRect" | "circle";
@@ -55,12 +59,7 @@ export type ImageElement = BaseElement & {
   cornerRadius: number;
   maskShape: ImageMaskShape;
 
-  filter: {
-    brightness: number;
-    contrast: number;
-    saturation: number;
-    blur: number;
-  };
+  filter: ImageFilter;
 
   /** AI 图像编辑蒙版 */
   aiMask?: ImageMaskData | null;
@@ -116,7 +115,7 @@ import type {
   WorkflowGraph,
   WorkflowNode,
   WorkflowNodePickerState,
-} from "../workflow/types";
+} from "../workflow/model/types";
 
 export type Page = {
   id: string;
@@ -132,7 +131,7 @@ export type Page = {
 
 export type ToolType = "select" | "rect" | "text" | "image" | "arrow" | "hand";
 
-import type { QuickToolId, QuickToolbarScopeKey } from "./quickTools";
+import type { QuickToolId, QuickToolbarScopeKey } from "./quick-tools/quickTools";
 
 export type EditorState = {
   pages: Page[];

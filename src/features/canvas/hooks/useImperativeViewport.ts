@@ -30,9 +30,22 @@ export function useImperativeViewport(stageRef: RefObject<Konva.Stage | null>) {
     [stageRef],
   );
 
-  function scheduleStoreSync() {
+  function cancelPendingStoreSync() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    flushToStore.cancel();
+  }
+
+  /** 滚轮缩放 / 拖动画布期间：禁止 store → stage 回写，避免与 Konva 实时位置打架 */
+  function beginStageViewportInteraction() {
     interactingRef.current = true;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    cancelPendingStoreSync();
+  }
+
+  function scheduleStoreSync() {
+    beginStageViewportInteraction();
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
       flushToStore(null);
@@ -102,12 +115,20 @@ export function useImperativeViewport(stageRef: RefObject<Konva.Stage | null>) {
     scheduleStoreSync();
   }
 
-  function syncPanFromStageDragEnd() {
+  function syncViewportFromStage() {
     const stage = stageRef.current;
     if (!stage) return;
+    cancelPendingStoreSync();
+    const store = useEditorStore.getState();
+    const z = stage.scaleX();
     const pan = { x: stage.x(), y: stage.y() };
-    useEditorStore.getState().setPan(pan);
+    if (store.zoom !== z) store.setZoom(z);
+    if (store.pan.x !== pan.x || store.pan.y !== pan.y) store.setPan(pan);
     interactingRef.current = false;
+  }
+
+  function syncPanFromStageDragEnd() {
+    syncViewportFromStage();
   }
 
   useEffect(
@@ -118,5 +139,9 @@ export function useImperativeViewport(stageRef: RefObject<Konva.Stage | null>) {
     [flushToStore],
   );
 
-  return { handleWheel, syncPanFromStageDragEnd };
+  return {
+    handleWheel,
+    beginStageViewportInteraction,
+    syncPanFromStageDragEnd,
+  };
 }

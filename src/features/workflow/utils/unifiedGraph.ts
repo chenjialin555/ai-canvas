@@ -1,6 +1,6 @@
-import type { CanvasElement, ImageElement, Page } from "../../editor/types";
-import { exportImageMaskToDataURL } from "../../image-tools/mask/maskRasterize";
-import { getWorkflowNodeDefinition } from "../nodeRegistry";
+import type { CanvasElement, ImageElement, Page } from "../../../features/editor/types";
+import { exportImageMaskToDataURL } from "../../../features/image-tools/mask/maskRasterize";
+import { getWorkflowNodeDefinition } from "../model/nodeRegistry";
 import {
   AI_NODE_MAX_HEIGHT,
   AI_NODE_MIN_HEIGHT,
@@ -9,7 +9,7 @@ import {
   aiOutputPortCenterLocal,
   bezierHorizontalOffset,
   imageOutputPortOffset,
-} from "../nodeLayout";
+} from "../model/nodeLayout";
 import type {
   NodeEdge,
   NodeEndpoint,
@@ -17,7 +17,7 @@ import type {
   WorkflowGraph,
   WorkflowNode,
   WorkflowOutputValue,
-} from "../types";
+} from "../model/types";
 
 /** 将 AI 节点宽高钳到最小布局尺寸（就地或新对象） */
 export function clampAiNodeDimensions<T extends { width: number; height: number }>(

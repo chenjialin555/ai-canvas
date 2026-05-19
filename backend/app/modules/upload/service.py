@@ -4,7 +4,7 @@ import logging
 
 from backend.app.core.settings import Settings
 from backend.app.storage.oss import ensure_url as oss_ensure_url
-from backend.app.schemas.upload import UploadImageURLRequest
+from backend.app.modules.upload.schemas import UploadImageURLRequest
 
 log = logging.getLogger("ai_canvas.upload")
 
@@ -66,3 +66,8 @@ class UploadService:
             url[:200] + ("…" if len(url) > 200 else ""),
         )
         return {"url": url}
+
+
+from backend.app.core.settings import settings
+
+upload_service = UploadService(settings)

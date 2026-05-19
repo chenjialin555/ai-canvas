@@ -12,7 +12,7 @@ import type { ImageElement } from "../../editor/types";
 import {
   createPannellumViewer,
   type PannellumViewerInstance,
-} from "../../lib/pannellumViewer";
+} from "../../../shared/lib/pannellumViewer";
 
 function panoramaRatioHint(width: number, height: number): string {
   const ratio = width / height;
@@ -43,7 +43,7 @@ export function Panorama3DEditorModal({ imageId, open, onClose }: Props) {
       | undefined;
   }, [page.elements, imageId]);
 
-  const imgLoaded = useCanvasImage(open ? sourceEl?.src : undefined);
+  const { image: imgLoaded } = useCanvasImage(open ? sourceEl?.src : undefined);
   const [panoramaSrc, setPanoramaSrc] = useState<string | null>(null);
   const [imageInfo, setImageInfo] = useState("");
 

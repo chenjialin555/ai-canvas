@@ -4,11 +4,11 @@ import type { CanvasElement } from "../../types";
 import type { Store, EditorClipboard } from "../types";
 import type { StoreGet, StoreSet } from "../sliceTypes";
 import { clone } from "../helpers/clone";
-import { endpointKey } from "../helpers/workflowEndpoint";
+import { endpointKey } from "../../../workflow/utils/workflowEndpoint";
 import {
   clampAiNodeDimensions,
 } from "../../../workflow/utils/unifiedGraph";
-import type { NodeEdge, WorkflowNode } from "../../../workflow/types";
+import type { NodeEdge, WorkflowNode } from "../../../workflow/model/types";
 
 export const EMPTY_ELEMENT_CLIPBOARD: EditorClipboard = {
   kind: "elements",
