@@ -2,6 +2,7 @@ import type { MutableRefObject } from "react";
 import { memo, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImageAdjustPanel } from "../../image-tools/adjust/ImageAdjustPanel";
+import { GridSplitMenu } from "../../image-tools/grid-split/GridSplitMenu";
 import type { Stage } from "konva/lib/Stage";
 import {
   getToolById,
@@ -140,6 +141,8 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
 
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [adjustImageId, setAdjustImageId] = useState<string | null>(null);
+  const [gridSplitImageId, setGridSplitImageId] = useState<string | null>(null);
+  const [gridSplitBusy, setGridSplitBusy] = useState(false);
 
   const page = getActivePage();
   const selectedEls = page.elements.filter((el) =>
@@ -159,6 +162,7 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
   useEffect(() => {
     if (n !== 1 || selectedEls[0]?.type !== "image") {
       setAdjustImageId(null);
+      setGridSplitImageId(null);
     }
   }, [n, selectedIds.join(",")]);
 
@@ -259,13 +263,20 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
 
     if (id === "crop" && el.type === "image") {
       setAdjustImageId(null);
+      setGridSplitImageId(null);
       props.onCrop(el.id);
     }
+    if (id === "grid-split" && el.type === "image") {
+      setAdjustImageId(null);
+      setGridSplitImageId((cur) => (cur === el.id ? null : el.id));
+    }
     if (id === "adjust" && el.type === "image") {
+      setGridSplitImageId(null);
       setAdjustImageId((cur) => (cur === el.id ? null : el.id));
     }
     if (id === "mask" && el.type === "image") {
       setAdjustImageId(null);
+      setGridSplitImageId(null);
       props.onMask(el.id);
     }
     if (id === "parse3d" && el.type === "image") props.onParse3d(el.id);
@@ -305,9 +316,13 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
       {tools.map((tool, i) => {
         const isAdjustActive =
           tool.id === "adjust" && adjustImageId === selectedEls[0]?.id;
+        const isGridSplitActive =
+          tool.id === "grid-split" && gridSplitImageId === selectedEls[0]?.id;
         let cls = "floating-toolbar__btn";
         if (i === 0) cls += " floating-toolbar__btn--lead";
-        if (isAdjustActive) cls += " floating-toolbar__btn--active";
+        if (isAdjustActive || isGridSplitActive) {
+          cls += " floating-toolbar__btn--active";
+        }
 
         return (
           <button
@@ -316,7 +331,7 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
             className={cls}
             title={tool.label}
             aria-label={tool.label}
-            aria-pressed={isAdjustActive || undefined}
+            aria-pressed={isAdjustActive || isGridSplitActive || undefined}
             onClick={() => runTool(tool.id)}
           >
             <span aria-hidden>{tool.icon}</span>
@@ -335,10 +350,34 @@ export const FloatingToolbar = memo(function FloatingToolbar(props: Props) {
       />
     ) : null;
 
+  const gridSplitMenu =
+    gridSplitImageId && pos ? (
+      <GridSplitMenu
+        anchor={{ left: pos.left, top: pos.top }}
+        busy={gridSplitBusy}
+        onClose={() => setGridSplitImageId(null)}
+        onApply={async (rows, cols) => {
+          setGridSplitBusy(true);
+          try {
+            await useEditorStore
+              .getState()
+              .splitImageToGrid(gridSplitImageId, rows, cols);
+          } catch (e) {
+            const msg =
+              e instanceof Error ? e.message : "宫格切分失败，请稍后重试";
+            window.alert(msg);
+          } finally {
+            setGridSplitBusy(false);
+          }
+        }}
+      />
+    ) : null;
+
   return createPortal(
     <>
       {bar}
       {adjustPanel}
+      {gridSplitMenu}
     </>,
     document.body,
   );

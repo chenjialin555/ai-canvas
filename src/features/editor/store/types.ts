@@ -57,6 +57,11 @@ export type Store = EditorState & {
     options?: { history?: boolean },
   ) => void;
   addElement: (element: CanvasElement) => void;
+  splitImageToGrid: (
+    id: string,
+    rows: number,
+    cols: number,
+  ) => Promise<string[]>;
   removeSelected: () => void;
 
   copy: () => void;

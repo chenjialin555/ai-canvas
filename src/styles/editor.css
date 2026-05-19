@@ -2305,3 +2305,186 @@ select {
   font-size: 12px;
   color: #94a3b8;
 }
+
+/* —— 宫格切分菜单（快捷条「宫格切分」） —— */
+.grid-split-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 8095;
+  pointer-events: auto;
+}
+
+.grid-split-menu {
+  position: fixed;
+  z-index: 8100;
+  width: 168px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  overflow: hidden;
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.grid-split-menu__head {
+  padding: 10px 12px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--panel-3), var(--panel));
+}
+
+.grid-split-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+.grid-split-menu__list > li + li {
+  margin-top: 2px;
+}
+
+.grid-split-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.grid-split-menu__item:hover:not(:disabled),
+.grid-split-menu__custom-row--open .grid-split-menu__item--custom {
+  background: color-mix(in srgb, var(--brand) 12%, var(--panel-2));
+  color: var(--text);
+}
+
+.grid-split-menu__item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.grid-split-menu__item-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.grid-split-menu__item-meta {
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.grid-split-menu__busy {
+  margin: 0;
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--text-3);
+  border-top: 1px solid var(--border);
+}
+
+.grid-split-custom {
+  position: fixed;
+  z-index: 8101;
+  width: 200px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.grid-split-custom__head {
+  padding: 10px 12px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.grid-split-custom__body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grid-split-custom__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.grid-split-custom__field input {
+  width: 64px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.grid-split-custom__field input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
+}
+
+.grid-split-custom__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-3);
+  padding-top: 4px;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.grid-split-custom__foot {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.grid-split-custom__apply {
+  width: 100%;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand) 88%, #7c6cff),
+    color-mix(in srgb, var(--primary) 90%, #5c7cfa)
+  );
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.grid-split-custom__apply:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.grid-split-custom__apply:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

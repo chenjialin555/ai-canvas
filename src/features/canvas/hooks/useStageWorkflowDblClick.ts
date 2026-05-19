@@ -21,9 +21,17 @@ function isUnderTransformer(node: Konva.Node | null): boolean {
 export function useStageWorkflowDblClick(
   stageRef: RefObject<Konva.Stage | null>,
 ) {
-  function handleStageDblClick(_e: Konva.KonvaEventObject<MouseEvent>) {
+  function handleStageDblClick(e: Konva.KonvaEventObject<MouseEvent>) {
     const stage = stageRef.current;
     if (!stage) return;
+
+    let node: Konva.Node | null = e.target;
+    while (node && node !== stage) {
+      if (isUnderTransformer(node)) return;
+      const name = node.name();
+      if (name === "editable-node" || name === "workflow-node") return;
+      node = node.getParent();
+    }
 
     const pointer = stage.getPointerPosition();
     if (!pointer) return;

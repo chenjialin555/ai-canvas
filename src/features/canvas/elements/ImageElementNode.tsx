@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import { Group, Image as KonvaImage, Rect, Text } from "react-konva";
+import type Konva from "konva";
 import type { SceneContext } from "konva/lib/Context";
 import { useEditorStore } from "../../editor/store";
 import { normalizeImageFilter } from "../../editor/image-filter/imageFilter";
@@ -220,6 +221,15 @@ export const ImageElementNode = memo(function ImageElementNode(
       onDblClick={(e) => {
         e.cancelBubble = true;
         e.evt.stopPropagation();
+        const group = e.currentTarget as Konva.Group;
+        group.stopDrag();
+        const latest = useEditorStore
+          .getState()
+          .getActivePage()
+          .elements.find((el) => el.id === element.id);
+        if (latest) {
+          group.position({ x: latest.x, y: latest.y });
+        }
         useEditorStore.getState().setSelectedIds([element.id]);
         props.onOpenCropEditor?.(element.id);
       }}

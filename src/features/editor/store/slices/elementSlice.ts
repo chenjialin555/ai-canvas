@@ -7,6 +7,7 @@ import {
   normalizeImageFilter,
   type ImageFilter,
 } from "../../image-filter/imageFilter";
+import { buildGridSplitElements } from "../../../image-tools/grid-split/splitImageToGrid";
 import type { CanvasElement, ImageMaskData } from "../../types";
 import type { Store } from "../types";
 import type { StoreGet, StoreSet } from "../sliceTypes";
@@ -265,6 +266,38 @@ export function createElementSlice(set: StoreSet, get: StoreGet) {
           el.aiMask = null;
         }),
       );
+    },
+
+    /** 将图片按 rows×cols 切分，在右侧生成对应宫格图层（单次 undo） */
+    splitImageToGrid: async (id: string, rows: number, cols: number) => {
+      const page = get().getActivePage();
+      const el = page.elements.find((item) => item.id === id);
+      if (!el || el.type !== "image" || el.locked) {
+        throw new Error("请选择未锁定的图片图层");
+      }
+
+      const pieces = await buildGridSplitElements(el, { rows, cols });
+      if (!pieces.length) {
+        throw new Error("切分失败，未生成任何宫格");
+      }
+
+      get().commitHistory();
+
+      const newIds = pieces.map((p) => p.id);
+      set(
+        produce<Store>((state) => {
+          const pg = state.pages.find((p) => p.id === state.activePageId);
+          if (!pg) return;
+          pg.elements.push(...pieces);
+          state.selectedIds = newIds;
+        }),
+      );
+
+      for (const piece of pieces) {
+        scheduleImageSrcPersist(get, piece.id, piece.src);
+      }
+
+      return newIds;
     },
   };
 }

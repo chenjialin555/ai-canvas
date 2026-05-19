@@ -9,6 +9,14 @@ import {
   gestureHistoryTransformEnd,
   gestureHistoryTransformStart,
 } from "../../editor/commands/interactionGestureHistory";
+import {
+  ELEMENT_DRAG_COMMIT_PX,
+  ELEMENT_DRAG_DISTANCE,
+  isNegligibleDrag,
+} from "../utils/dragThreshold";
+
+const DRAG_START_X = "_dragStartX";
+const DRAG_START_Y = "_dragStartY";
 
 export function commonProps(element: CanvasElement) {
   return {
@@ -21,6 +29,7 @@ export function commonProps(element: CanvasElement) {
     rotation: element.rotation,
     opacity: element.opacity,
     draggable: !element.locked,
+    dragDistance: ELEMENT_DRAG_DISTANCE,
     onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
       e.cancelBubble = true;
 
@@ -40,16 +49,26 @@ export function commonProps(element: CanvasElement) {
         state.setSelectedIds([element.id]);
       }
     },
-    onDragStart: () => {
+    onDragStart: (e: Konva.KonvaEventObject<DragEvent>) => {
+      const latest = useEditorStore
+        .getState()
+        .getActivePage()
+        .elements.find((el) => el.id === element.id);
+      const sx = latest?.x ?? e.target.x();
+      const sy = latest?.y ?? e.target.y();
+      e.target.setAttr(DRAG_START_X, sx);
+      e.target.setAttr(DRAG_START_Y, sy);
       useEditorStore.getState().setFloatingToolbarSuppressed(true);
       gestureHistoryDragStart();
     },
     onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => {
       const state = useEditorStore.getState();
       const pg = state.getActivePage();
+      const latest = pg.elements.find((el) => el.id === element.id);
+      if (!latest) return;
 
       const moving = {
-        ...element,
+        ...latest,
         x: e.target.x(),
         y: e.target.y(),
       };
@@ -68,9 +87,21 @@ export function commonProps(element: CanvasElement) {
       try {
         const state = useEditorStore.getState();
         const pg = state.getActivePage();
+        const latest = pg.elements.find((el) => el.id === element.id);
+        if (!latest) return;
+
+        const startX = (e.target.getAttr(DRAG_START_X) as number | undefined) ?? latest.x;
+        const startY = (e.target.getAttr(DRAG_START_Y) as number | undefined) ?? latest.y;
+        const dx = e.target.x() - startX;
+        const dy = e.target.y() - startY;
+
+        if (isNegligibleDrag(dx, dy, ELEMENT_DRAG_COMMIT_PX)) {
+          e.target.position({ x: latest.x, y: latest.y });
+          return;
+        }
 
         const moving = {
-          ...element,
+          ...latest,
           x: e.target.x(),
           y: e.target.y(),
         };

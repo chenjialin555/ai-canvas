@@ -69,6 +69,7 @@ export function StageCanvas(props: StageCanvasProps) {
         ref={setStageInstance}
         width={stageWidth}
         height={stageHeight}
+        dragDistance={10}
         draggable={
           spacePan || (!marqueeSelecting && !workflowConnectingActive)
         }

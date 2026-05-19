@@ -7,6 +7,7 @@ export type QuickToolbarElementType =
 
 export type QuickToolId =
   | "crop"
+  | "grid-split"
   | "adjust"
   | "mask"
   | "parse3d"
@@ -37,6 +38,12 @@ export const QUICK_TOOL_LIBRARY: QuickTool[] = [
     id: "crop",
     label: "裁剪",
     icon: "✂",
+    elementTypes: ["image"],
+  },
+  {
+    id: "grid-split",
+    label: "宫格切分",
+    icon: "⊞",
     elementTypes: ["image"],
   },
   {
@@ -137,6 +144,7 @@ export const DEFAULT_QUICK_TOOLBAR_CONFIG: Record<
 > = {
   image: [
     "crop",
+    "grid-split",
     "adjust",
     "mask",
     "parse3d",
@@ -180,6 +188,11 @@ export function normalizeQuickToolbarIds(
     const cropIdx = resolved.indexOf("crop");
     if (cropIdx >= 0) resolved.splice(cropIdx + 1, 0, "adjust");
     else resolved.unshift("adjust");
+  }
+  if (scope === "image" && !resolved.includes("grid-split")) {
+    const cropIdx = resolved.indexOf("crop");
+    if (cropIdx >= 0) resolved.splice(cropIdx + 1, 0, "grid-split");
+    else resolved.unshift("grid-split");
   }
   return resolved;
 }

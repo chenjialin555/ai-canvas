@@ -5,6 +5,11 @@ import { EMPTY_ELEMENTS } from "../../editor/store/shallowEqual";
 import type { CanvasElement, ImageElement } from "../../editor/types";
 import { setGuidesRuntime } from "../guides/guidesRuntime";
 import { getSnap } from "./getSnap";
+import {
+  ELEMENT_DRAG_COMMIT_PX,
+  ELEMENT_DRAG_DISTANCE,
+  isNegligibleDrag,
+} from "../utils/dragThreshold";
 import { ImageLoadingOverlay } from "./ImageLoadingOverlay";
 import { useCanvasImage } from "./useCanvasImage";
 import {
@@ -164,6 +169,7 @@ export function GroupElementNode(props: GroupElementNodeProps) {
       rotation={g.rotation}
       opacity={g.opacity}
       draggable={!g.locked}
+      dragDistance={ELEMENT_DRAG_DISTANCE}
       onClick={(e) => {
         e.cancelBubble = true;
         const state = useEditorStore.getState();
@@ -178,7 +184,9 @@ export function GroupElementNode(props: GroupElementNodeProps) {
           state.setSelectedIds([g.id]);
         }
       }}
-      onDragStart={() => {
+      onDragStart={(e) => {
+        e.target.setAttr("_dragStartX", g.x);
+        e.target.setAttr("_dragStartY", g.y);
         useEditorStore.getState().setFloatingToolbarSuppressed(true);
         gestureHistoryDragStart();
       }}
@@ -201,7 +209,16 @@ export function GroupElementNode(props: GroupElementNodeProps) {
           if (!cur || cur.type !== "group") return;
 
           const pg = st.getActivePage();
-          const moving = { ...g, x: e.target.x(), y: e.target.y() };
+          const startX = (e.target.getAttr("_dragStartX") as number | undefined) ?? cur.x;
+          const startY = (e.target.getAttr("_dragStartY") as number | undefined) ?? cur.y;
+          const dragDx = e.target.x() - startX;
+          const dragDy = e.target.y() - startY;
+          if (isNegligibleDrag(dragDx, dragDy, ELEMENT_DRAG_COMMIT_PX)) {
+            e.target.position({ x: cur.x, y: cur.y });
+            return;
+          }
+
+          const moving = { ...cur, x: e.target.x(), y: e.target.y() };
           const snap = getSnap(
             moving,
             pg.elements.filter((el) => !st.selectedIds.includes(el.id)),
